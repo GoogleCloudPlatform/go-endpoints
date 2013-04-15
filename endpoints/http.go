@@ -9,8 +9,11 @@ import (
 	"strings"
 )
 
+// Maybe get rid of gorilla/pat or any other third-party router?
+// It looks like there's enough (discovery) info to do routing w/o a muxer.
 var router *pat.Router
 
+// TODO: make it nested within ErrorResponse?
 type ErrorMessage struct {
 	Code    int    `json:"code"`
 	Message string `json:"message,omitempty"`
@@ -20,6 +23,20 @@ type ErrorResponse struct {
 	Error ErrorMessage `json:"error"`
 }
 
+// ServeHTTP parses JSON request body and query params into a struct,
+// calls the method and responds with JSON-encoded struct of what the method
+// returns.
+//
+// Query params overwrite request body. That is, given this POST request:
+//
+//   POST /path?param1=a
+//   body: {"param1": "b", "param2": "c"}
+//
+// the method will be called with {Param1: "a", Param2: "c"} struct.
+//
+// TODO: add all sorts of kind/type/error checking
+// TODO: maybe move reflection stuff out of here since the method signatures
+//       can't really change in run-time?
 func (m ApiMethod) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqValPtr := reflect.New(m.reqType)
 	if r.Method == "POST" || r.Method == "PUT" {
@@ -82,6 +99,11 @@ func (m ApiMethod) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// Handle mounts all API paths to http's muxer using provided prefix.
+// For instance, having "/api" as a prefix will make the discovery be accessible
+// at /api/discovery/v1/apis and a specific API at /api/myapi/v1/...
+//
+// TODO: add support for non-default http's muxer.
 func Handle(prefix string) {
 	if router == nil {
 		router = pat.New()

@@ -16,6 +16,8 @@ type JsonSchema struct {
 	Properties map[string]*JsonSchema `json:"properties,omitempty"`
 	ExtraProps *JsonSchema            `json:"additionalProperties,omitempty"`
 	Items      *JsonSchema            `json:"items,omitempty"`
+	// TODO: add 'enum', 'location', 'repeated', 'required' and other fields
+	// from https://developers.google.com/discovery/v1/reference/apis
 }
 
 type RestMethod struct {
@@ -23,11 +25,15 @@ type RestMethod struct {
 	HttpMethod  string
 	Desc        string
 	ParamsOrder []string `json:"parametersOrder,omitempty"`
+	// TODO: add missing fields from
+	// https://developers.google.com/discovery/v1/reference/apis
 }
 
 type RestResource struct {
 	Methods   map[string]*RestMethod   `json:"methods,omitempty"`
 	Resources map[string]*RestResource `json:"resources,omitempty"`
+	// TODO: add missing fields from
+	// https://developers.google.com/discovery/v1/reference/apis
 }
 
 type RestDescription struct {
@@ -38,6 +44,8 @@ type RestDescription struct {
 	Protocol  string                   `json:"protocol"`
 	Methods   map[string]*RestMethod   `json:"methods,omitempty"`
 	Resources map[string]*RestResource `json:"resources,omitempty"`
+	// TODO: add missing fields from
+	// https://developers.google.com/discovery/v1/reference/apis
 }
 
 func simpleKindToStr(k reflect.Kind) (string, string) {
@@ -89,6 +97,7 @@ func typeToSchema(schemas map[string]*JsonSchema, t reflect.Type) error {
 				prop.Type, prop.Format = simpleKindToStr(field.Type.Kind())
 			case reflect.Struct:
 				prop.Type = "object"
+				// TODO: add properties description of struct fields.
 			case reflect.Map:
 				prop.Type = "object"
 				el := field.Type.Elem()
@@ -132,6 +141,8 @@ type getRestRequest struct {
 	Version string
 }
 
+// getRest describes an API identified by name + version.
+// TODO: populate doc.Methods and doc.Resources!
 func getRest(req *getRestRequest, doc *RestDescription) (int, string) {
 	doc.Id = req.Api + ":" + req.Version
 	doc.Name = req.Api

@@ -54,4 +54,5 @@ TODO (besides tests):
     authentication wouldn't be limited to just Google Accounts but work
     with any provider. Maybe something along the lines of what I did
     in simpleauth for Python?
+  - Batch support
   - Media upload/download support?
