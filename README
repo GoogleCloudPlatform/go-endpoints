@@ -32,6 +32,7 @@ TODO (besides tests):
     to do routing. I used it initially just to boostrap my playground
     w/o reinventing the wheel.
   - Discovery APIs list (directory). For now there's just a piece of getRest()
+    method.
   - Add "methods", "resources" and other missing pieces to the generated
     discovery doc.
   - Add proxy.html & friends to make API explorer work (JS client-related).
@@ -39,6 +40,11 @@ TODO (besides tests):
   - Simplify methods' error signature. I don't really like the way it is
     right now. Currently, an API method's supposed to always return a non-zero
     (code int, msg string) to indicate an error.
+  - Allow access to *http.Request (or at least headers),
+    maybe appengine.Context (if I have Context then I probably won't need the
+    whole http.Request),
+    and current user making a request (once the auth part is done).
+    Maybe, inject this stuff based on the method signature? (using reflect).
   - Add RPC. Maybe merge with gorilla/rpc/protorpc?
   - Add support for caching ("Cache-Control" header and friends).
   - Authentication! Since I can't tap into Google's API infastructure, most
