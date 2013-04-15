@@ -22,7 +22,7 @@ Browse to http://localhost:8080 or whatever the host:port you're running it on
 and try some example links displayed on the page.
 
 
-If you have some ideas or think this is a total noncense, please do let me know!
+If you have some ideas or think this is a total nonsense, please do let me know!
 
 
 TODO (besides tests):
@@ -54,3 +54,4 @@ TODO (besides tests):
     authentication wouldn't be limited to just Google Accounts but work
     with any provider. Maybe something along the lines of what I did
     in simpleauth for Python?
+  - Media upload/download support?
