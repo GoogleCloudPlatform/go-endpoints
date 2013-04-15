@@ -1,0 +1,46 @@
+= Go Endpoints
+
+This project is an attempt to implement RESTful + RPC package which would allow
+you to easily create APIs for your app backend running on Google App Engine,
+compatible with Google Discovery mechanism.
+
+Much like Cloud Endpoints but for Go.
+
+This is really just a playground for now. Go away :)
+Seriously though, it's far from being complete and documented, so it's really
+hard to make it do something useful unless you just want to browse the code.
+Best way to do that is to look at the exampleapp, which BTW is running live at
+https://go-endpoints.appspot.com
+
+
+If you're still here, go ahead and clone away. After you cloned the repo,
+start the dev server with:
+
+  GOSDK/dev_appserver.py exampleapp/
+
+Browse to http://localhost:8080 or whatever the host:port you're running it on
+and try some example links displayed on the page.
+
+
+If you have some ideas or think this is a total noncense, please do let me know!
+
+
+TODO (besides tests):
+  
+  - Discovery APIs list (directory). For now there's just a piece of getRest()
+  - Add "methods", "resources" and other missing pieces to the generated
+    discovery doc.
+  - Add proxy.html & friends to make API explorer work (JS client-related).
+  - Errors and edge cases proper handling.
+  - Simplify methods' error signature. I don't really like the way it is
+    right now. Currently, an API method's supposed to always return a non-zero
+    (code int, msg string) to indicate an error.
+  - Add RPC. Maybe merge with gorilla/rpc/protorpc?
+  - Add support for caching ("Cache-Control" header and friends).
+  - Authentication! Since I can't tap into Google's API infastructure, most
+    importantly the auth part, I guess I'll need to make an OAuth2 server
+    myself. I think I saw something already done in that direction.
+    Ideally, this would be some sort of a federated OAuth2 server, so that
+    authentication wouldn't be limited to just Google Accounts but work
+    with any provider. Maybe something along the lines of what I did
+    in simpleauth for Python?
