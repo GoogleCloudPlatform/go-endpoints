@@ -27,6 +27,10 @@ If you have some ideas or think this is a total noncense, please do let me know!
 
 TODO (besides tests):
   
+  - Do something with import "github.com/gorilla/pat" as this seems like
+    an overkill: there's already enought information in the discovery structs
+    to do routing. I used it initially just to boostrap my playground
+    w/o reinventing the wheel.
   - Discovery APIs list (directory). For now there's just a piece of getRest()
   - Add "methods", "resources" and other missing pieces to the generated
     discovery doc.
