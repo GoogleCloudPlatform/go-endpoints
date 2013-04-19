@@ -43,7 +43,8 @@ List greetings:
 
 ## Things I'm not happy about and will be working on (or anyone else's welcome!)
 
-  - Add tests
+  - Add real tests
+  - Add something like endpoints.CurrentUser()
   - Remove spaghetti code
   - A more flexible service method signature
     (*http.Request is not always needed, and appengine.Context would be enough)

@@ -11,6 +11,8 @@ import (
 	"github.com/crhym3/go-endpoints/endpoints"
 )
 
+var authScope = "https://www.googleapis.com/auth/userinfo.email"
+
 // Greeting is a datastore entity that represents a single greeting.
 // It also serves as (part of) a response of GreetingService.
 type Greeting struct {
@@ -66,7 +68,7 @@ func (gs *GreetingService) Sign(
 	greet.Date = time.Now()
 
 	// Most likely, this is not currently supported, yet.
-	if u := user.Current(ctx); u != nil {
+	if u, err := user.CurrentOAuth(ctx, authScope); err == nil {
 		greet.Author = u.String()
 	} else {
 		greet.Author = "Anonymous User"
@@ -159,7 +161,7 @@ func init() {
 	info = rpcService.MethodByName("Sign").Info()
 	info.Name, info.HttpMethod, info.Path, info.Desc =
 		"greets.sign", "POST", "greetings", "Sign the guestbook."
-	info.Scopes = []string{"https://www.googleapis.com/auth/userinfo.email"}
+	info.Scopes = []string{authScope}
 
 	info = rpcService.MethodByName("Delete").Info()
 	info.Name, info.HttpMethod, info.Path, info.Desc =
