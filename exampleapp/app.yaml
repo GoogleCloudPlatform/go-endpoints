@@ -1,0 +1,11 @@
+application: go-endpoints
+version: v1
+threadsafe: true
+
+runtime: go
+api_version: go1
+
+handlers:
+- url: /.*
+  secure: always
+  script: _go_app
