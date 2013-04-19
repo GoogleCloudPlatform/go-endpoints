@@ -9,3 +9,6 @@ handlers:
 - url: /.*
   secure: always
   script: _go_app
+
+- url: /_ah/spi/.*
+  script: _go_app

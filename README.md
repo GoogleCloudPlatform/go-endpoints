@@ -1,6 +1,9 @@
 # Go Endpoints
 
-This is a very pre-alpha version of Cloud Endpoints for Go and currently works only on the dev server (doesn't work on appspot.com)
+This is a very pre-alpha version of Cloud Endpoints for Go, though it works on
+appspot too, check it out!
+
+[go-endpoints.appspot.com](https://go-endpoints.appspot.com)
 
 ## Getting Started
 If you really want to try it out:
