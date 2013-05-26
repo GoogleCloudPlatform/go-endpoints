@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head><title>Go Endpoints</title></head>
+  <body>
+    <h1>Go Endpoints</h1>
+    <p>Hello, gopher! Try this:</p>
+
+    <ul>
+      <li><a href="/_ah/api/discovery/v1/apis" target="_blank">
+        /_ah/api/discovery/v1/apis
+      </a></li>
+      <li><a href="/_ah/api/discovery/v1/apis/greeting/v1/rest" target="_blank">
+        /_ah/api/discovery/v1/apis/greeting/v1/rest
+      </a></li>
+    </ul>
+    <iframe src="{{.ApiExplorerUrl}}?base={{.BaseUrl}}/_ah/api#p/greeting/v1/"
+            style="width: 100%; height: 600px; border: none;"></iframe>
+ 
+    <hr/>
+    Source code:
+    <a href="https://github.com/crhym3/go-endpoints" target="_blank">
+      github.com/crhym3/go-endpoints
+    </a>
+  </body>
+</html>
