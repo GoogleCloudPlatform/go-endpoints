@@ -13,6 +13,7 @@ const (
 		"federated-signon@system.gserviceaccount.com")
 	EmailScope   = "https://www.googleapis.com/auth/userinfo.email"
 	TokeninfoUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo"
+	ApiExplorerClientId  = "292824132082.apps.googleusercontent.com"
 )
 
 // Currently a stub.
