@@ -37,7 +37,7 @@ func (s *Score) timestamp() string {
 func (s *Score) put(c appengine.Context) (err error) {
 	key := s.key
 	if key == nil {
-		key = datastore.NewKey(c, SCORE_KIND, "", 0, nil)
+		key = datastore.NewIncompleteKey(c, SCORE_KIND, nil)
 	}
 	key, err = datastore.Put(c, key, s)
 	if err == nil {
