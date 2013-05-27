@@ -11,6 +11,9 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	// Mainly for debug logging
+	"appengine"
+	"io/ioutil"
 )
 
 // errorResponse is SPI-compatible error response
@@ -119,8 +122,11 @@ func (s *Server) HandleHttp(mux *http.ServeMux) {
 
 // ServeHTTP is Server's implementation of http.ServiceByName interface.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Always respond with JSON, even when an error occurs
-	// API server doesn't expect an encoding in Content-Type header.
+	// Mainly for debug logging
+	c := appengine.NewContext(r)
+
+	// Always respond with JSON, even when an error occurs.
+	// Note: API server doesn't expect an encoding in Content-Type header.
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != "POST" {
@@ -148,8 +154,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Initialize RPC method request
 	req := reflect.New(methodSpec.ReqType)
 
-	if err := json.NewDecoder(r.Body).Decode(req.Interface()); err != nil {
-		writeError(w, fmt.Errorf("Error while decoding JSON: %q", err))
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	c.Debugf("SPI request body: %s", body)
+
+	// if err := json.NewDecoder(r.Body).Decode(req.Interface()); err != nil {
+	// 	writeError(w, fmt.Errorf("Error while decoding JSON: %q", err))
+	// 	return
+	// }
+	if err := json.Unmarshal(body, req.Interface()); err != nil {
+		writeError(w, err)
 		return
 	}
 
