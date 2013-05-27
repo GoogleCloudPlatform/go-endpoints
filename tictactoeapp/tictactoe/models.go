@@ -10,7 +10,7 @@ import (
 
 const (
 	TIME_LAYOUT = "Jan 2, 2006 15:04:05 AM"
-	SCORE_KIND = "Score"
+	SCORE_KIND  = "Score"
 )
 
 type Score struct {

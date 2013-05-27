@@ -1,11 +1,11 @@
 package tictactoe
 
 import (
-	"net/http"
 	"errors"
 	"fmt"
-	"time"
 	"math/rand"
+	"net/http"
+	"time"
 
 	"appengine"
 	"appengine/user"
@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	clientId = "YOUR-CLIENT-ID"  // xxx.apps.googleusercontent.com
+	clientId  = "YOUR-CLIENT-ID" // xxx.apps.googleusercontent.com
 	authScope = "https://www.googleapis.com/auth/userinfo.email"
 )
 
@@ -74,7 +74,6 @@ func (ttt *TicTacToeApi) BoardGetMove(r *http.Request,
 	}
 	return nil
 }
-
 
 func (ttt *TicTacToeApi) ScoresList(r *http.Request,
 	req *ScoresListReq, resp *ScoresListResp) error {
