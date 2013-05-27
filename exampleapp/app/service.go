@@ -153,6 +153,7 @@ func init() {
 	if err != nil {
 		panic(err.Error())
 	}
+	rpcService.Info().Name = "greeting"
 
 	info := rpcService.MethodByName("List").Info()
 	info.Name, info.HttpMethod, info.Path, info.Desc =

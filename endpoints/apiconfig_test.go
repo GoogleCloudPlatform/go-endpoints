@@ -35,7 +35,8 @@ func (s *DummyService) Substruct(r *http.Request, _ *VoidMessage, resp *DummySub
 func createDescriptor(t *testing.T) *ApiDescriptor {
 	server := NewServer("")
 	dummy := &DummyService{}
-	s, err := server.RegisterService(dummy, "DummyService", "v1", "A service")
+	s, err := server.RegisterService(
+		dummy, "Dummy", "v1", "A service", true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -78,7 +79,7 @@ func TestApiDescriptor(t *testing.T) {
 		{d.Root, "https://localhost/_ah/api"},
 		{d.Name, "dummy"},
 		{d.Version, "v1"},
-		{d.Default, false},
+		{d.Default, true},
 		{d.Adapter.Bns, "https://localhost/_ah/spi"},
 		{d.Adapter.Type, "lily"},
 		{len(d.Methods), 2},

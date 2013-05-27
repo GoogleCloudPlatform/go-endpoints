@@ -18,7 +18,7 @@ type ApiConfigs struct {
 // responds with a config suitable for generating Discovery doc.
 func (s *BackendService) GetApiConfigs(
 	r *http.Request, _ *VoidMessage, resp *ApiConfigs) error {
-	
+
 	resp.Items = make([]string, 0)
 	for _, service := range s.server.services.services {
 		if service.internal {
@@ -40,7 +40,7 @@ func (s *BackendService) GetApiConfigs(
 // This is a test method and will be removed sooner or later.
 func (s *BackendService) GetFirstConfig(
 	r *http.Request, _ *VoidMessage, resp *ApiDescriptor) error {
-	
+
 	for _, service := range s.server.services.services {
 		if !service.internal {
 			return service.ApiDescriptor(resp, r.Host)

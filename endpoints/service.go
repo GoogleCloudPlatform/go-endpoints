@@ -113,33 +113,31 @@ type serviceMap struct {
 // 
 // internal == true indicase that this is an internal service,
 // e.g. BackendService
-func (m *serviceMap) register(srv interface{}, name, ver, desc string, internal bool) (
+func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault, internal bool) (
 	*RpcService, error) {
 
 	// Setup service.
 	s := &RpcService{
-		name:     name,
 		rcvr:     reflect.ValueOf(srv),
 		rcvrType: reflect.TypeOf(srv),
 		methods:  make(map[string]*ServiceMethod),
 		internal: internal,
 	}
-
-	if s.name == "" {
-		s.name = reflect.Indirect(s.rcvr).Type().Name()
-		if !isExported(s.name) {
-			return nil, fmt.Errorf("endpoints: type %q is not exported", s.name)
-		}
-	}
-	if s.name == "" {
+	s.name = reflect.Indirect(s.rcvr).Type().Name()
+	if !isExported(s.name) {
 		return nil, fmt.Errorf("endpoints: no service name for type %q",
 			s.rcvrType.String())
 	}
 
 	if !internal {
-		s.info = &ServiceInfo{Version: ver, Description: desc}
-		if idx := strings.Index(s.name, "Service"); idx > 0 {
-			s.info.Name = s.name[:idx]
+		s.info = &ServiceInfo{
+			Name:        name,
+			Version:     ver,
+			Default:     isDefault,
+			Description: desc,
+		}
+		if s.info.Name == "" {
+			s.info.Name = s.name
 		}
 		s.info.Name = strings.ToLower(s.info.Name)
 		if s.info.Version == "" {

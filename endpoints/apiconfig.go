@@ -136,6 +136,7 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 	dst.Name = s.Info().Name
 	dst.Version = s.Info().Version
 	dst.Default = s.Info().Default
+	dst.Desc = s.Info().Description
 
 	dst.Adapter.Bns = fmt.Sprintf("https://%s/_ah/spi", host)
 	dst.Adapter.Type = "lily"

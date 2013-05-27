@@ -71,7 +71,7 @@ func NewServer(root string) *Server {
 
 	server := &Server{root: root, services: new(serviceMap)}
 	backend := newBackendService(server)
-	server.services.register(backend, "BackendService", "", "", true)
+	server.services.register(backend, "BackendService", "", "", true, true)
 	return server
 }
 
@@ -91,15 +91,15 @@ func NewServer(root string) *Server {
 //    - The method has return type error.
 //
 // All other methods are ignored.
-func (s *Server) RegisterService(srv interface{}, name, ver, desc string) (*RpcService, error) {
-	return s.services.register(srv, name, ver, desc, false)
+func (s *Server) RegisterService(srv interface{}, name, ver, desc string, isDefault bool) (*RpcService, error) {
+	return s.services.register(srv, name, ver, desc, isDefault, false)
 }
 
 // RegisterServiceWithDefaults will register provided service and will try to
 // infer Endpoints config params from its method names and types.
 // See RegisterService for details.
 func (s *Server) RegisterServiceWithDefaults(srv interface{}) (*RpcService, error) {
-	return s.RegisterService(srv, "", "", "")
+	return s.RegisterService(srv, "", "", "", true)
 }
 
 // ServiceByName returns a registered service or nil if there's no service
@@ -185,10 +185,10 @@ var DefaultServer *Server
 
 // RegisterService registers a service using DefaultServer.
 // See Server.RegisterService for details.
-func RegisterService(srv interface{}, name, ver, desc string) (
+func RegisterService(srv interface{}, name, ver, desc string, isDefault bool) (
 	*RpcService, error) {
 
-	return DefaultServer.RegisterService(srv, name, ver, desc)
+	return DefaultServer.RegisterService(srv, name, ver, desc, isDefault)
 }
 
 // RegisterServiceWithDefaults registers a service using DefaultServer.
