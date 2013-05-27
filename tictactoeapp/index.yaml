@@ -1,0 +1,12 @@
+indexes:
+
+- kind: Score
+  properties:
+  - name: player
+  - name: played
+    direction: desc
+
+- kind: Score
+  properties:
+  - name: player
+  - name: outcome

@@ -1,0 +1,24 @@
+application: go-endpoints
+version: tictactoe
+runtime: go
+threadsafe: true
+api_version: go1
+
+handlers:
+# Static assets
+- url: /favicon\.ico
+  static_files: favicon.ico
+  upload: favicon\.ico
+- url: /js
+  static_dir: static/js
+- url: /css
+  static_dir: static/css
+- url: /images
+  static_dir: static/images
+- url: /
+  static_files: templates/tictactoe.html
+  upload: templates/tictactoe\.html
+
+# Endpoints handler
+- url: /_ah/spi/.*
+  script: _go_app

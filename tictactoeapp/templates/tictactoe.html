@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TicTacToe</title>
+    <script type="text/javascript" src="/js/base.js"></script>
+    <link rel="stylesheet" href="/css/base.css" />
+  </head>
+  <body>
+    <div id="content">
+      <div id="signin">
+        <a href="#" onclick="google.devrel.samples.ttt.auth();" id="signinButton">Sign in!</a>
+        <span id="userLabel">(not signed in)</span>
+      </div>
+      <div id="warning">
+        <img src="/images/caution.gif" />
+        <p>You must sign in to play!</p>
+      </div>
+      <div id="board" class="hidden">
+        <table>
+          <tr>
+            <td class="noTop noLeft">-</td>
+            <td class="noTop">-</td>
+            <td class="noTop noRight">-</td>
+          </tr>
+          <tr>
+            <td class="noLeft">-</td>
+            <td>-</td>
+            <td class="noRight">-</td>
+          </tr>
+          <tr>
+            <td class="noBottom noLeft">-</td>
+            <td class="noBottom">-</td>
+            <td class="noBottom noRight">-</td>
+          </tr>
+        </table>
+        <div id="restartButton"><a href="#">Restart</a></div>
+        <div id="victory"></div>
+      </div>
+      <div id="gameHistoryWrapper" class="hidden">
+        <h2>Recent Games</h2>
+        <ul id="gameHistory"></ul>
+      </div>
+      <script type="text/javascript">
+        function init() {
+          google.devrel.samples.ttt.init('//' + window.location.host + '/_ah/api');
+        }
+      </script>
+      <script src="https://apis.google.com/js/client.js?onload=init"></script>
+    </div>
+  </body>
+</html>
