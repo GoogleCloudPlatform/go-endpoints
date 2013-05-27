@@ -1,6 +1,7 @@
 package endpoints
 
 import (
+	"appengine"
 	"appengine/user"
 	"errors"
 )
@@ -16,7 +17,7 @@ const (
 
 // Currently a stub.
 // See https://github.com/crhym3/go-endpoints/issues/2
-func CurrentUserWithScope(scope string) (*user.User, error) {
+func CurrentUserWithScope(c appengine.Context, scope string) (*user.User, error) {
 	return user.CurrentOAuth(c, scope)
 }
 
