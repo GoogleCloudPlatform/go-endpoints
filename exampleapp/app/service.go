@@ -105,7 +105,7 @@ func (gs *GreetingService) Delete(
 type TestMessageGet struct {
 	A int   `endpoints:"required"`
 	B int32 `endopints:"100"`                // default
-	C int64 `endpoints:",This is a C field"` // description
+	C int64 `json:",string" endpoints:",This is a C field"` // description
 	D float32
 	E float64
 	F string
@@ -130,7 +130,6 @@ type TestMessagePost struct {
 }
 
 // EchoGet is a method to test different message field types.
-// It doesn't work, yet.
 func (gs *GreetingService) EchoGet(
 	r *http.Request, req *TestMessageGet, res *TestMessageGet) error {
 
@@ -138,8 +137,17 @@ func (gs *GreetingService) EchoGet(
 	return nil
 }
 
+// QueryEchoGet is the same as EchoGet, only that it's API path template
+// does not contain message fields so they all should go in the query part
+// of a request URL.
+func (gs *GreetingService) QueryEchoGet(
+	r *http.Request, req *TestMessageGet, res *TestMessageGet) error {
+
+	*res = *req
+	return nil
+}
+
 // EchoPost is a method to test different message field types.
-// This should work.
 func (gs *GreetingService) EchoPost(
 	r *http.Request, req *TestMessagePost, res *TestMessagePost) error {
 
@@ -171,8 +179,11 @@ func init() {
 	info = rpcService.MethodByName("EchoGet").Info()
 	info.Name, info.HttpMethod, info.Path =
 		// These should match TestMessageGet field names
-		// Lower-case param names coming soon.
 		"tests.echoGet", "GET", "tests/echo/{A}/{B}/{C}/{D}/{E}/{F}/{G}"
+
+	info = rpcService.MethodByName("QueryEchoGet").Info()
+	info.Name, info.HttpMethod, info.Path =
+		"tests.queryEchoGet", "GET", "tests/query"
 
 	info = rpcService.MethodByName("EchoPost").Info()
 	info.Name, info.HttpMethod, info.Path =
