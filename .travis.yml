@@ -1,0 +1,6 @@
+language: go
+install:
+  - go get github.com/crhym3/aegot/aet
+  - aet init
+script:
+  - $GOPATH/bin/aet test ./endpoints

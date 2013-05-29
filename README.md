@@ -1,3 +1,7 @@
+<a href="https://travis-ci.org/crhym3/go-endpoints" target="_blank">
+  <img align="right" src="https://travis-ci.org/crhym3/go-endpoints.png"
+       alt="Build Status">
+</a>
 # The missing Cloud Endpoints for Go
 
 This package will let you write Cloud Endpoints backends in Go.
