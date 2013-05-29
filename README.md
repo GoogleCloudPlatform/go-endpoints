@@ -1,51 +1,133 @@
-# Go Endpoints
+# The missing Cloud Endpoints for Go
 
-This is a very pre-alpha version of Cloud Endpoints for Go, though it works on
-appspot too, check it out!
+This package will let you write Cloud Endpoints backends in Go.
+If you don't know what this is, see Google App Engine official implementations
+for [Python][1] and [Java][2].
 
-[go-endpoints.appspot.com](https://go-endpoints.appspot.com)
+Start with `go get github.com/crhym3/go-endpoints/endpoints`.
 
-## Getting Started
-If you really want to try it out:
+Declare structs which describe your data. For instance:
 
-`go get github.com/crhym3/go-endpoints/endpoints`
+```go
+// Greeting is a datastore entity that represents a single greeting.
+// It also serves as (a part of) a response of GreetingService.
+type Greeting struct {
+  Id      string    `json:"id,omitempty" datastore:"-"`
+  Author  string    `json:"author"`
+  Content string    `json:"content" datastore:",noindex"`
+  Date    time.Time `json:"date"`
+}
 
-or, if you prefer Google Code:
+// GreetingsList is a response type of GreetingService.List method
+type GreetingsList struct {
+  Items []*Greeting `json:"items"`
+}
 
-`go get code.google.com/p/go-endpoints/endpoints`
+// Request type for GreetingService.List
+type GreetingsListReq struct {
+  Limit int
+}
+```
 
-Then copy [github.com/crhym3/go-endpoints/tree/master/exampleapp](https://github.com/crhym3/go-endpoints/tree/master/exampleapp) and run dev server:
+Then, a service:
 
-`GOSDK/dev_appserver.py exampleapp/`
+```go
+// GreetingService can sign the guesbook, list all greetings and delete
+// a greeting from the guestbook.
+type GreetingService struct {
+}
 
-It's a simple guestbook app taken from https://developers.google.com/appengine/docs/go/gettingstarted/usingdatastore
+// List responds with a list of all greetings ordered by Date field.
+// Most recent greets come first.
+func (gs *GreetingService) List(
+  r *http.Request, req *GreetingsListReq, resp *GreetingsList) error {
 
-***
+  ctx := appengine.NewContext(r)
+  q := datastore.NewQuery("Greeting").Order("-Date").Limit(req.Limit)
+  greets := make([]*Greeting, 0, req.Limit)
+  keys, err := q.GetAll(ctx, &greets)
+  if err != nil {
+    return err
+  }
 
-Browse to [http://localhost:8080](http://localhost:8080) and you should be able to see something like
-this:
+  for i, k := range keys {
+    greets[i].Id = k.Encode()
+  }
+  resp.Items = greets
+  return nil
+}
+```
 
-![http://localhost:8080](https://lh6.googleusercontent.com/-9wk96-rUcvo/UXFeTpzWi8I/AAAAAAAART0/4D31sBNdppk/s900/Screen+Shot+2013-04-19+at+5.06.12+PM.png)
+Last step is to make the above avaiable as an API and leverage all
+the juicy stuff Cloud Endpoints are great at.
 
-***
+```go
+import "github.com/crhym3/go-endpoints/endpoints"
 
-Try signing the guestbook:
+func init() {
+  greetService := &GreetingService{}
+  api, err := endpoints.RegisterService(greetService,
+    "greeting", "v1", "Greetings API", true)
+  if err != nil {
+    panic(err.Error())
+  }
 
-![Sign guesbook](https://lh5.googleusercontent.com/-ravF58cJy9Q/UXFeR8aC5aI/AAAAAAAARTc/ZCDqI8vpzq4/s826/Screen+Shot+2013-04-19+at+5.07.46+PM.png)
+  info := api.MethodByName("List").Info()
+  info.Name, info.HttpMethod, info.Path, info.Desc =
+    "greets.list", "GET", "greetings", "List most recent greetings."
 
-![Sign response](https://lh4.googleusercontent.com/-b_R1g2iYTDU/UXFeREDzSuI/AAAAAAAARTU/rwM47Sp-xf8/s571/Screen+Shot+2013-04-19+at+5.08.06+PM.png)
+  endpoints.HandleHttp()
+```
 
-***
+Don't forget to add URL matching in app.yaml:
 
-List greetings:
+```yaml
+application: my-app-id
+version: v1
+threadsafe: true
 
-![List greetings](https://lh3.googleusercontent.com/-lMd8bB2zjmw/UXFeQeqsM9I/AAAAAAAARTM/oqhCYNxmeWc/s574/Screen+Shot+2013-04-19+at+5.08.30+PM.png)
+runtime: go
+api_version: go1
 
-## Things I'm not happy about and will be working on (or anyone else's welcome!)
+handlers:
+- url: /.*
+  script: _go_app
 
-  - Add real tests
-  - Add something like endpoints.CurrentUser()
-  - Remove spaghetti code
-  - A more flexible service method signature
-    (*http.Request is not always needed, and appengine.Context would be enough)
-  - A nicer solution for setting all kinds of parameters of discovery doc.
+# Important! Even though there's a catch all routing above, without
+#these two line it's not going to work. Make sure you have this:
+- url: /_ah/spi/.*
+  script: _go_app
+```
+
+That's it. It is time to start the dev server and enjoy the discovery doc at
+http://localhost:8080/_ah/api/discovery/v1/apis/greeting/v1/rest
+
+Naturally, API Explorer works too:
+http://localhost:8080/_ah/api/explorer
+
+Time to deploy the app on appengine.appspot.com!
+
+Samples
+===
+
+Check out the famous [TicTacToe app][3]. It has its own readme file.
+
+
+Running tests
+===
+
+We currently use [aet tool][4] to simplify running tests on files that have
+"appengine" or "appengine_internal" imports.
+
+Check out the readme of that tool but, assuming you cloned this repo (so you can reach ./endpoints dir), initial setup process is actually pretty simple:
+
+  - `go get github.com/crhym3/aegot/aet`
+  - `aet init ./endpoints`
+
+That's it. You should be able to run tests now with "aet test ./endpoints".
+
+
+[1]: https://developers.google.com/appengine/docs/python/endpoints/
+[2]: https://developers.google.com/appengine/docs/java/endpoints/
+[3]: https://github.com/crhym3/go-endpoints/tree/master/tictactoeapp
+[4]: https://github.com/crhym3/aegot
