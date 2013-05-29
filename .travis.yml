@@ -4,4 +4,4 @@ install:
   - go get github.com/crhym3/aegot/aet
   - cd $TRAVIS_BUILD_DIR && $GOPATH/bin/aet init ./endpoints
 script:
-  - cd $TRAVIS_BUILD_DIR && $GOPATH/bin/aet test ./endpoints
+  - cd $TRAVIS_BUILD_DIR && $GOPATH/bin/aet test -v ./endpoints
