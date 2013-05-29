@@ -1,7 +1,7 @@
 language: go
 install:
+  - go get code.google.com/p/goprotobuf/proto
   - go get github.com/crhym3/aegot/aet
   - $GOPATH/bin/aet init
 script:
-  - pushd $TRAVIS_BUILD_DIR
-  - $GOPATH/bin/aet test ./endpoints
+  - "cd $TRAVIS_BUILD_DIR && $GOPATH/bin/aet test ./endpoints"
