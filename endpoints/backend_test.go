@@ -1,11 +1,11 @@
 package endpoints
 
 import (
-	"log"
-	"fmt"
 	"bytes"
-	"testing"
+	"fmt"
+	"log"
 	"net/http"
+	"testing"
 
 	"github.com/crhym3/aegot/testutils"
 )
@@ -26,7 +26,7 @@ func TestEmptyApiConfigsList(t *testing.T) {
 	r := newBackendHttpRequest("GetApiConfigs", nil)
 	req := &GetApiConfigsRequest{}
 	resp := &ApiConfigsList{}
-	
+
 	if err := backend.GetApiConfigs(r, req, resp); err != nil {
 		t.Error(err)
 	}

@@ -1,8 +1,9 @@
 # The missing Cloud Endpoints for Go
 
 This package will let you write Cloud Endpoints backends in Go.
-If you don't know what this is, see Google App Engine official implementations
-for [Python][1] and [Java][2].
+
+If you're not familiar with Cloud Endpoints, see Google App Engine official
+documentation for [Python][1] or [Java][2].
 
 Start with `go get github.com/crhym3/go-endpoints/endpoints`.
 
@@ -58,8 +59,8 @@ func (gs *GreetingService) List(
 }
 ```
 
-Last step is to make the above avaiable as an API and leverage all
-the juicy stuff Cloud Endpoints are great at.
+Last step is to make the above available as a **discoverable API**
+and leverage all the juicy stuff Cloud Endpoints are great at.
 
 ```go
 import "github.com/crhym3/go-endpoints/endpoints"
@@ -93,19 +94,20 @@ handlers:
 - url: /.*
   script: _go_app
 
-# Important! Even though there's a catch all routing above, without
-#these two line it's not going to work. Make sure you have this:
+# Important! Even though there's a catch all routing above,
+# without these two lines it's not going to work.
+# Make sure you have this:
 - url: /_ah/spi/.*
   script: _go_app
 ```
 
-That's it. It is time to start the dev server and enjoy the discovery doc at
-http://localhost:8080/_ah/api/discovery/v1/apis/greeting/v1/rest
+That's it. It is time to start dev server and enjoy the discovery doc at
+[localhost:8080/_ah/api/discovery/v1/apis/greeting/v1/rest][5]
 
 Naturally, API Explorer works too:
-http://localhost:8080/_ah/api/explorer
+[localhost:8080/_ah/api/explorer][6]
 
-Time to deploy the app on appengine.appspot.com!
+Time to deploy the app on [appengine.appspot.com][7]!
 
 Samples
 ===
@@ -119,15 +121,19 @@ Running tests
 We currently use [aet tool][4] to simplify running tests on files that have
 "appengine" or "appengine_internal" imports.
 
-Check out the readme of that tool but, assuming you cloned this repo (so you can reach ./endpoints dir), initial setup process is actually pretty simple:
+Check out the readme of that tool but, assuming you cloned this repo
+(so you can reach ./endpoints dir), the initial setup process is pretty simple:
 
   - `go get github.com/crhym3/aegot/aet`
   - `aet init ./endpoints`
 
-That's it. You should be able to run tests now with "aet test ./endpoints".
+That's it. You should be able to run tests with "aet test ./endpoints" now.
 
 
 [1]: https://developers.google.com/appengine/docs/python/endpoints/
 [2]: https://developers.google.com/appengine/docs/java/endpoints/
 [3]: https://github.com/crhym3/go-endpoints/tree/master/tictactoeapp
 [4]: https://github.com/crhym3/aegot
+[5]: http://localhost:8080/_ah/api/discovery/v1/apis/greeting/v1/rest
+[6]: http://localhost:8080/_ah/api/explorer
+[7]: http://appengine.appspot.com
