@@ -1,5 +1,5 @@
 <a href="https://travis-ci.org/crhym3/go-endpoints" target="_blank">
-  <img align="right" src="https://travis-ci.org/crhym3/go-endpoints.png"
+  <img align="right" src="https://api.travis-ci.org/crhym3/go-endpoints.png"
        alt="Build Status">
 </a>
 # The missing Cloud Endpoints for Go
