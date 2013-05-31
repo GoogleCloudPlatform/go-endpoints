@@ -39,8 +39,9 @@ func TestCurrentBearerTokenUser(t *testing.T) {
 	unregister := tu.RegisterAPIOverride("user", "GetOAuthUser", getOAuthUser)
 	defer unregister()
 
-	req, deleteContext := tu.NewTestRequest("GET", "/", nil)
-	defer deleteContext()
+	req, deleteAppengineCtx := tu.NewTestRequest("GET", "/", nil)
+	defer deleteAppengineCtx()
+	c := NewContext(req)
 
 	tt := []*struct {
 		scopes    []string
@@ -54,7 +55,7 @@ func TestCurrentBearerTokenUser(t *testing.T) {
 		{[]string{"a", validScope, "b"}, []string{"c", validClientId, "d"}, true},
 	}
 	for _, elem := range tt {
-		user, err := CurrentBearerTokenUser(req, elem.scopes, elem.clientIDs)
+		user, err := CurrentBearerTokenUser(c, elem.scopes, elem.clientIDs)
 		switch {
 		case elem.success && (err != nil || user == nil):
 			t.Errorf("Did not expect the call to fail with "+
@@ -68,7 +69,7 @@ func TestCurrentBearerTokenUser(t *testing.T) {
 
 	scopes := []string{validScope}
 	clientIDs := []string{validClientId}
-	user, _ := CurrentBearerTokenUser(req, scopes, clientIDs)
+	user, _ := CurrentBearerTokenUser(c, scopes, clientIDs)
 	const failMsg = "Expected %q, got %q"
 	if user.ID != userId {
 		t.Errorf(failMsg, userId, user.ID)
