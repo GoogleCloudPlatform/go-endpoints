@@ -2,7 +2,6 @@ package endpoints
 
 import (
 	"net/http"
-	"reflect"
 	"testing"
 )
 
@@ -55,26 +54,9 @@ func createDescriptor(t *testing.T) *ApiDescriptor {
 	return d
 }
 
-type equalsTTRow struct {
-	exp interface{}
-	act interface{}
-}
-
-func assertEquals(t *testing.T, act, exp interface{}) {
-	if !reflect.DeepEqual(exp, act) {
-		t.Errorf("Expected %q to equal %q", act, exp)
-	}
-}
-
-func runTT(t *testing.T, tests []*equalsTTRow) {
-	for _, test := range tests {
-		assertEquals(t, test.act, test.exp)
-	}
-}
-
 func TestApiDescriptor(t *testing.T) {
 	d := createDescriptor(t)
-	runTT(t, []*equalsTTRow{
+	verifyTT(t, []*ttRow{
 		{d.Extends, "thirdParty.api"},
 		{d.Root, "https://localhost/_ah/api"},
 		{d.Name, "dummy"},
@@ -95,7 +77,7 @@ func TestApiEchoMethod(t *testing.T) {
 		t.Errorf("Expected to find ApiMethod 'dummy.echoMe'")
 		return
 	}
-	runTT(t, []*equalsTTRow{
+	verifyTT(t, []*ttRow{
 		{meth.Path, "echome/{int}/{float64}"},
 		{meth.HttpMethod, "POST"},
 		{meth.RosyMethod, "DummyService.Echo"},
@@ -119,7 +101,7 @@ func TestApiSubstructMethod(t *testing.T) {
 		t.Errorf("Expected to find ApiMethod 'dummy.substruct'")
 		return
 	}
-	runTT(t, []*equalsTTRow{
+	verifyTT(t, []*ttRow{
 		{meth.Path, "sub/{string}"},
 		{meth.HttpMethod, "GET"},
 		{meth.RosyMethod, "DummyService.Substruct"},
