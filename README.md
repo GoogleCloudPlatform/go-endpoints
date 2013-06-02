@@ -82,6 +82,7 @@ func init() {
     "greets.list", "GET", "greetings", "List most recent greetings."
 
   endpoints.HandleHttp()
+}
 ```
 
 Don't forget to add URL matching in app.yaml:
