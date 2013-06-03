@@ -10,17 +10,18 @@ import (
 	"testing"
 )
 
-// ttRow is a table test row. When the order matters, "a" is normally "actual"
-// and "b" is expected.
-type ttRow struct {
-	a interface{}
-	b interface{}
-}
-
-// verifyTT loops over tests and assertEquals on each ttRow.
-func verifyTT(t *testing.T, tests []*ttRow) {
-	for _, test := range tests {
-		assertEquals(t, test.a, test.b)
+// verifyTT loops over ab slice and assertEquals on each pair.
+// Expects even number of ab args.
+// When the order matters, "a" (first element of ab pair) is normally "actual"
+// and "b" (second element) is expected.
+func verifyTT(t *testing.T, ab ...interface{}) {
+	lenAb := len(ab)
+	if lenAb%2 != 0 {
+		fail(t, "verifyTT: odd number of ab args (%d)", lenAb)
+		return
+	}
+	for i := 0; i < lenAb; i += 2 {
+		assertEquals(t, ab[i], ab[i+1])
 	}
 }
 
@@ -48,6 +49,6 @@ func fail(t *testing.T, msg string, args ...interface{}) {
 // When the order matters, "a" is normally an actual value, "b" is expected.
 func assertEquals(t *testing.T, a, b interface{}) {
 	if !reflect.DeepEqual(a, b) {
-		fail(t, "Expected %#+v to equal %#+v", a, b)
+		fail(t, "Expected %#+v (%T) to equal %#+v (%T)", a, a, b, b)
 	}
 }

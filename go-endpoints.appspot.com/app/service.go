@@ -174,7 +174,7 @@ func init() {
 
 	info = rpcService.MethodByName("Delete").Info()
 	info.Name, info.HttpMethod, info.Path, info.Desc =
-		"greets.delete", "DELETE", "greetings/{Id}", "Delete a single Greeting."
+		"greets.delete", "DELETE", "greetings/{id}", "Delete a single Greeting."
 
 	info = rpcService.MethodByName("EchoGet").Info()
 	info.Name, info.HttpMethod, info.Path =
