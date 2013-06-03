@@ -1,0 +1,261 @@
+{
+  "name": "greeting",
+  "abstract": false,
+  "descriptor": {
+    "methods": {
+      "GreetingService.List": {
+        "response": {
+          "$ref": "GreetingsList"
+        }
+      },
+      "GreetingService.EchoGet": {
+        "response": {
+          "$ref": "TestMessageGet"
+        }
+      },
+      "GreetingService.Delete": {},
+      "GreetingService.EchoPost": {
+        "request": {
+          "$ref": "TestMessagePost"
+        },
+        "response": {
+          "$ref": "TestMessagePost"
+        }
+      },
+      "GreetingService.Sign": {
+        "request": {
+          "$ref": "NewGreet"
+        },
+        "response": {
+          "$ref": "Greeting"
+        }
+      }
+    },
+    "schemas": {
+      "TestMessagePost": {
+        "type": "object",
+        "id": "TestMessagePost",
+        "properties": {
+          "A": {
+            "type": "integer"
+          },
+          "C": {
+            "type": "string",
+            "format": "int64"
+          },
+          "B": {
+            "type": "integer"
+          },
+          "E": {
+            "type": "number",
+            "format": "double"
+          },
+          "D": {
+            "type": "number",
+            "format": "float"
+          },
+          "G": {
+            "type": "boolean"
+          },
+          "F": {
+            "type": "string"
+          },
+          "I": {
+            "type": "string",
+            "format": "byte"
+          },
+          "H": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "K": {
+            "items": {
+              "$ref": "TestMessagePost"
+            },
+            "type": "array"
+          },
+          "J": {
+            "$ref": "TestMessageGet"
+          }
+        }
+      },
+      "GreetingsList": {
+        "type": "object",
+        "id": "GreetingsList",
+        "properties": {
+          "Items": {
+            "items": {
+              "$ref": "Greeting"
+            },
+            "type": "array"
+          }
+        }
+      },
+      "TestMessageGet": {
+        "type": "object",
+        "id": "TestMessageGet",
+        "properties": {
+          "A": {
+            "type": "integer"
+          },
+          "C": {
+            "type": "string",
+            "format": "int64"
+          },
+          "B": {
+            "type": "integer"
+          },
+          "E": {
+            "type": "number",
+            "format": "double"
+          },
+          "D": {
+            "type": "number",
+            "format": "float"
+          },
+          "G": {
+            "type": "boolean"
+          },
+          "F": {
+            "type": "string"
+          }
+        }
+      },
+      "Greeting": {
+        "type": "object",
+        "id": "Greeting",
+        "properties": {
+          "Content": {
+            "type": "string"
+          },
+          "Date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "Id": {
+            "type": "string"
+          },
+          "Author": {
+            "type": "string"
+          }
+        }
+      },
+      "NewGreet": {
+        "type": "object",
+        "id": "NewGreet",
+        "properties": {
+          "Message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "version": "v1",
+  "extends": "thirdParty.api",
+  "defaultVersion": false,
+  "root": "https://localhost:8080/_ah/api",
+  "adapter": {
+    "bns": "https://localhost:8080/_ah/spi",
+    "type": "lily"
+  },
+  "methods": {
+    "greeting.greets.sign": {
+      "scopes": [
+        "https://www.googleapis.com/auth/userinfo.email"
+      ],
+      "description": "Sign the guestbook.",
+      "request": {
+        "body": "autoTemplate(backendRequest)",
+        "bodyName": "resource"
+      },
+      "rosyMethod": "GreetingService.Sign",
+      "httpMethod": "POST",
+      "path": "greetings",
+      "response": {
+        "body": "autoTemplate(backendResponse)",
+        "bodyName": "resource"
+      }
+    },
+    "greeting.tests.echoPost": {
+      "path": "tests/echo",
+      "response": {
+        "body": "autoTemplate(backendResponse)",
+        "bodyName": "resource"
+      },
+      "rosyMethod": "GreetingService.EchoPost",
+      "request": {
+        "body": "autoTemplate(backendRequest)",
+        "bodyName": "resource"
+      },
+      "httpMethod": "POST"
+    },
+    "greeting.greets.list": {
+      "description": "List most recent greetings.",
+      "request": {
+        "body": "empty"
+      },
+      "rosyMethod": "GreetingService.List",
+      "httpMethod": "GET",
+      "path": "greetings",
+      "response": {
+        "body": "autoTemplate(backendResponse)",
+        "bodyName": "resource"
+      }
+    },
+    "greeting.greets.delete": {
+      "description": "Delete a single Greeting.",
+      "request": {
+        "body": "empty",
+        "parameters": {
+          "Id": {
+            "required": true,
+            "type": "string"
+          }
+        }
+      },
+      "rosyMethod": "GreetingService.Delete",
+      "httpMethod": "DELETE",
+      "path": "greetings/{Id}",
+      "response": {
+        "body": "empty"
+      }
+    },
+    "greeting.tests.echoGet": {
+      "path": "tests/echo/{A}/{B}/{C}/{D}/{E}/{F}/{G}",
+      "response": {
+        "body": "autoTemplate(backendResponse)",
+        "bodyName": "resource"
+      },
+      "rosyMethod": "GreetingService.EchoGet",
+      "request": {
+        "body": "empty",
+        "parameters": {
+          "A": {
+            "required": true,
+            "type": "int32"
+          },
+          "C": {
+            "type": "int64"
+          },
+          "B": {
+            "type": "int32"
+          },
+          "E": {
+            "type": "double"
+          },
+          "D": {
+            "type": "float"
+          },
+          "G": {
+            "type": "boolean"
+          },
+          "F": {
+            "type": "string"
+          }
+        }
+      },
+      "httpMethod": "GET"
+    }
+  }
+}
