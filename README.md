@@ -9,7 +9,30 @@ This package will let you write Cloud Endpoints backends in Go.
 If you're not familiar with Cloud Endpoints, see Google App Engine official
 documentation for [Python][1] or [Java][2].
 
-Start with `go get github.com/crhym3/go-endpoints/endpoints`.
+Install
+===
+
+Start with `go get github.com/crhym3/go-endpoints/endpoints`. If this is not
+the first time you're "getting" the package, add `-u` param to get an updated
+version, i.e. `go get -u ...`.
+
+Now, you'll see a couple errors:
+
+```
+package appengine: unrecognized import path "appengine"
+package appengine/user: unrecognized import path "appengine/user"
+package appengine_internal/user: unrecognized import path "appengine_internal/user"
+```
+
+which is OK, don't worry! The issue here is Go looks at all imports in
+`endpoints` package and cannot find "appengine/*" packages nowhere in your
+`$GOPATH`. That's because they're not there, indeed. Appengine packages are
+normally available only when running an app with dev appserver, and since that's
+precisely what we want to do, "unrecognized import path" errors can be safely
+ignored.
+
+Usage
+===
 
 Declare structs which describe your data. For instance:
 
