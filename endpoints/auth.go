@@ -80,9 +80,10 @@ func NewContext(req *http.Request) Context {
 	return c
 }
 
-// getToken looks for Authorization header and returns Bearer token.
+// getToken looks for Authorization header and returns a token.
+// 
 // Returns empty string if req does not contain authorization header
-// or its value is not prefixed with either Bearer or OAuth.
+// or its value is not prefixed with allowedAuthSchemesUpper.
 func getToken(req *http.Request) string {
 	// TODO(dhermes): Allow a struct with access_token and bearer_token
 	//                fields here as well.
@@ -99,15 +100,15 @@ func getToken(req *http.Request) string {
 	return ""
 }
 
-type Cert struct {
+type certInfo struct {
 	Algorithm string `json:"algorithm"`
 	Exponent  string `json:"exponent"`
 	KeyID     string `json:"keyid"`
 	Modulus   string `json:"modulus"`
 }
 
-type Certs struct {
-	KeyValues []Cert `json:"keyvalues"`
+type certsList struct {
+	KeyValues []certInfo `json:"keyvalues"`
 }
 
 // getMaxAge parses Cache-Control header value and extracts max-age (in seconds)
@@ -159,13 +160,13 @@ func getCertExpirationTime(h http.Header) *time.Duration {
 	return &duration
 }
 
-func getCachedCerts(c Context) (*Certs, error) {
+func getCachedCerts(c Context) (*certsList, error) {
 	namespacedContext, err := appengine.Namespace(c, certNamespace)
 	if err != nil {
 		return nil, err
 	}
 
-	var certs *Certs
+	var certs *certsList
 
 	_, err = memcache.JSON.Get(namespacedContext, DefaultCertUri, &certs)
 	if err == nil {
@@ -231,7 +232,10 @@ type signedJWT struct {
 
 // addBase64Pad pads s to be a valid base64-encoded string.
 func addBase64Pad(s string) string {
-	for len(s)%4 != 0 {
+	switch len(s) % 4 {
+	case 2:
+		s += "=="
+	case 3:
 		s += "="
 	}
 	return s

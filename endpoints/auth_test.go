@@ -24,11 +24,15 @@ func TestGetToken(t *testing.T) {
 		header, value, expected string
 	}{
 		{"Authorization", "Bearer token", "token"},
-		{"Authorization", "bearer token", "token"},
-		{"Authorization", "OAuth token", "token"},
+		{"Authorization", "bearer foo", "foo"},
+		{"authorization", "bearer bar", "bar"},
+		{"Authorization", "OAuth baz", "baz"},
+		{"authorization", "oauth xxx", "xxx"},
 		{"Authorization", "Bearer", ""},
+		{"authorization", "Bearer  ", ""},
 		{"Authorization", "", ""},
 		{"X-Other-Header", "Bearer token", ""},
+		{"x-header", "Bearer token", ""},
 		{"", "", ""},
 	}
 	for i, tt := range tts {
@@ -51,8 +55,11 @@ func TestGetMaxAge(t *testing.T) {
 		expected int
 	}{
 		{"max-age=86400", 86400},
-		{"max-age = 86400, must-revalidate", 86400},
-		{"public, max-age= 86400", 86400},
+		{"max-age = 7200, must-revalidate", 7200},
+		{"public, max-age= 3600", 3600},
+		{"max-age=-100", -100},
+		{"max-age = 0a1b, must-revalidate", 0},
+		{"public, max-age= short", 0},
 		{"s-maxage=86400", 0},
 		{"max=86400", 0},
 		{"public", 0},
@@ -98,9 +105,10 @@ func TestGetCertExpirationTime(t *testing.T) {
 
 func TestAddBase64Pad(t *testing.T) {
 	verifyTT(t,
-		addBase64Pad("1234"), "1234",
 		addBase64Pad("12"), "12==",
-		addBase64Pad("12345"), "12345===",
+		addBase64Pad("123"), "123=",
+		addBase64Pad("1234"), "1234",
+		addBase64Pad("12345"), "12345",
 		addBase64Pad(""), "")
 }
 
@@ -182,17 +190,17 @@ func TestGetCachedCertsCacheHit(t *testing.T) {
 
 	tts := []struct {
 		cacheValue string
-		expected   *Certs
+		expected   *certsList
 	}{
 		{"", nil},
-		{"{}", &Certs{}},
-		{`{"keyvalues": [{}]}`, &Certs{[]Cert{{}}}},
+		{"{}", &certsList{}},
+		{`{"keyvalues": [{}]}`, &certsList{[]certInfo{{}}}},
 		{`{"keyvalues": [
 	    	{"algorithm": "RS256",
 	    	 "exponent": "123",
 	    	 "keyid": "some-id",
 	    	 "modulus": "123"} ]}`,
-			&Certs{[]Cert{{"RS256", "123", "some-id", "123"}}}},
+			&certsList{[]certInfo{{"RS256", "123", "some-id", "123"}}}},
 	}
 	for i, tt := range tts {
 		cacheValue = []byte(tt.cacheValue)
@@ -215,7 +223,7 @@ func TestGetCachedCertsCacheMiss(t *testing.T) {
 		respContent                  []byte
 		cacheControl, age            string
 
-		expected        *Certs
+		expected        *certsList
 		shouldCallMcSet bool
 	}
 	var (
@@ -261,18 +269,18 @@ func TestGetCachedCertsCacheMiss(t *testing.T) {
 		// mcGet, mcSet, fetch err, http status, content,
 		// cache, age, expected, should mcSet?
 		{memcache.ErrCacheMiss, nil, nil, 200, []byte(`{"keyvalues":null}`),
-			"max-age=3600", "600", &Certs{}, true},
+			"max-age=3600", "600", &certsList{}, true},
 		{memcache.ErrServerError, nil, nil, 200, []byte(`{"keyvalues":null}`),
-			"max-age=3600", "600", &Certs{}, false},
+			"max-age=3600", "600", &certsList{}, false},
 		{memcache.ErrCacheMiss, memcache.ErrServerError, nil, 200,
 			[]byte(`{"keyvalues":null}`),
-			"max-age=3600", "600", &Certs{}, true},
+			"max-age=3600", "600", &certsList{}, true},
 		{memcache.ErrCacheMiss, nil, errors.New("fetch RPC error"), 0, nil,
 			"", "", nil, false},
 		{memcache.ErrCacheMiss, nil, nil, 400, []byte(""),
 			"", "", nil, false},
 		{memcache.ErrCacheMiss, nil, nil, 200, []byte(`{"keyvalues":null}`),
-			"", "", &Certs{}, false},
+			"", "", &certsList{}, false},
 	}
 
 	c := NewContext(r)
