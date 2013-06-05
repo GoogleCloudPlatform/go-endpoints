@@ -39,8 +39,7 @@ var (
 	certNamespace           = "__verify_jwt"
 	clockSkewSecs           = int64(300)   // 5 minutes in seconds
 	maxTokenLifetimeSecs    = int64(86400) // 1 day in seconds
-	maxAgePattern           = regexp.MustCompile(`\s*max-age\s*=\s*(?P<age>\d+)\s*`)
-	maxAgeTemplate          = []byte("${age}")
+	maxAgePattern           = regexp.MustCompile(`\s*max-age\s*=\s*(\d+)\s*`)
 
 	// This is a variable on purpose: can be stubbed with a different (fake)
 	// implementation during tests.
@@ -121,56 +120,52 @@ type certInfo struct {
 }
 
 type certsList struct {
-	KeyValues []certInfo `json:"keyvalues"`
+	KeyValues []*certInfo `json:"keyvalues"`
 }
 
 // getMaxAge parses Cache-Control header value and extracts max-age (in seconds)
-func getMaxAge(s string) *int {
-	sAsByte := []byte(s)
-
-	match := maxAgePattern.FindSubmatchIndex(sAsByte)
-	if len(match) == 0 {
-		return nil
+func getMaxAge(s string) int {
+	match := maxAgePattern.FindStringSubmatch(s)
+	if len(match) != 2 {
+		return 0
 	}
-	result, err := strconv.Atoi(string(maxAgePattern.Expand(nil, maxAgeTemplate, sAsByte, match)))
-	if err != nil {
-		return nil
+	if maxAge, err := strconv.Atoi(match[1]); err == nil {
+		return maxAge
 	}
-	return &result
+	return 0
 }
 
 // getCertExpirationTime computes a cert freshness based on Cache-Control
 // and Age headers of h.
 // 
-// Returns nil if of the required headers is not present or cert lifetime
+// Returns 0 if one of the required headers is not present or cert lifetime
 // is expired.
-func getCertExpirationTime(h http.Header) *time.Duration {
+func getCertExpirationTime(h http.Header) time.Duration {
 	// http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2 indicates only
 	// a comma-separated header is valid, so it should be fine to split this on
 	// commas.
-	var maxAge *int
+	var maxAge int
 	for _, entry := range strings.Split(h.Get("Cache-Control"), ",") {
 		maxAge = getMaxAge(entry)
-		if maxAge != nil {
+		if maxAge > 0 {
 			break
 		}
 	}
-
-	if maxAge == nil {
-		return nil
+	if maxAge <= 0 {
+		return 0
 	}
 
 	age, err := strconv.Atoi(h.Get("Age"))
 	if err != nil {
-		return nil
+		return 0
 	}
 
-	remainingTime := *maxAge - age
+	remainingTime := maxAge - age
 	if remainingTime <= 0 {
-		return nil
+		return 0
 	}
-	duration := time.Duration(remainingTime) * time.Second
-	return &duration
+
+	return time.Duration(remainingTime) * time.Second
 }
 
 func getCachedCerts(c Context) (*certsList, error) {
@@ -215,11 +210,11 @@ func getCachedCerts(c Context) (*certsList, error) {
 
 	if cacheResults {
 		expiration := getCertExpirationTime(resp.Header)
-		if expiration != nil {
+		if expiration > 0 {
 			item := &memcache.Item{
 				Key:        DefaultCertUri,
 				Value:      certBytes,
-				Expiration: *expiration,
+				Expiration: expiration,
 			}
 			err = memcache.Set(namespacedContext, item)
 			if err != nil {
@@ -235,12 +230,12 @@ type signedJWTHeader struct {
 }
 
 type signedJWT struct {
-	Audience *string `json:"aud"`
-	ClientID *string `json:"azp"`
-	Email    *string `json:"email"`
-	Expires  *int64  `json:"exp"`
-	IssuedAt *int64  `json:"iat"`
-	Issuer   *string `json:"iss"`
+	Audience string `json:"aud"`
+	ClientID string `json:"azp"`
+	Email    string `json:"email"`
+	Expires  int64  `json:"exp"`
+	IssuedAt int64  `json:"iat"`
+	Issuer   string `json:"iss"`
 }
 
 // addBase64Pad pads s to be a valid base64-encoded string.
@@ -378,20 +373,20 @@ func verifySignedJwt(c Context, jwt string, now int64) (*signedJWT, error) {
 	}
 
 	// Check time
-	if token.IssuedAt == nil {
-		return nil, fmt.Errorf("No iat field in token: %s", tokenBytes)
+	if token.IssuedAt == 0 {
+		return nil, fmt.Errorf("Invalid iat value in token: %s", tokenBytes)
 	}
-	earliest := *token.IssuedAt - clockSkewSecs
+	earliest := token.IssuedAt - clockSkewSecs
 	if now < earliest {
 		return nil, fmt.Errorf("Token used too early, %d < %d: %s", now, earliest, tokenBytes)
 	}
 
-	if token.Expires == nil {
-		return nil, fmt.Errorf("No exp field in token: %s", tokenBytes)
-	} else if *token.Expires >= now+maxTokenLifetimeSecs {
-		return nil, fmt.Errorf("exp field too far in future: %s", tokenBytes)
+	if token.Expires == 0 {
+		return nil, fmt.Errorf("Invalid exp value in token: %s", tokenBytes)
+	} else if token.Expires >= now+maxTokenLifetimeSecs {
+		return nil, fmt.Errorf("exp value is too far in the future: %s", tokenBytes)
 	}
-	latest := *token.Expires + clockSkewSecs
+	latest := token.Expires + clockSkewSecs
 	if now > latest {
 		return nil, fmt.Errorf("Token used too late, %d > %d: %s", now, latest, tokenBytes)
 	}
@@ -406,27 +401,27 @@ func verifySignedJwt(c Context, jwt string, now int64) (*signedJWT, error) {
 // by audiences and clientIDs args.
 func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs []string) bool {
 	// Verify the issuer.
-	if token.Issuer == nil || *token.Issuer != "accounts.google.com" {
+	if token.Issuer != "accounts.google.com" {
 		c.Warningf("Issuer was not valid: %s", token.Issuer)
 		return false
 	}
 
 	// Check audiences.
-	if token.Audience == nil {
-		c.Warningf("No aud field in token")
+	if token.Audience == "" {
+		c.Warningf("Invalid aud value in token")
 		return false
 	}
 
-	if token.ClientID == nil {
-		c.Warningf("No azp field in token")
+	if token.ClientID == "" {
+		c.Warningf("Invalid azp value in token")
 		return false
 	}
 
 	// This is only needed if Audience and ClientID differ, which (currently) only
 	// happens on Android. In the case they are equal, we only need the ClientID to
 	// be in the listed of accepted Client IDs.
-	if *token.ClientID != *token.Audience && !contains(audiences, *token.Audience) {
-		c.Warningf("Audience not allowed: %s", *token.Audience)
+	if token.ClientID != token.Audience && !contains(audiences, token.Audience) {
+		c.Warningf("Audience not allowed: %s", token.Audience)
 		return false
 	}
 
@@ -434,13 +429,13 @@ func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs
 	if len(clientIDs) == 0 {
 		c.Warningf("No allowed client IDs specified. ID token cannot be verified.")
 		return false
-	} else if !contains(clientIDs, *token.ClientID) {
-		c.Warningf("Client ID is not allowed: %s", *token.ClientID)
+	} else if !contains(clientIDs, token.ClientID) {
+		c.Warningf("Client ID is not allowed: %s", token.ClientID)
 		return false
 	}
 
-	if token.Email == nil {
-		c.Warningf("No email field in token")
+	if token.Email == "" {
+		c.Warningf("Invalid email value in token")
 		return false
 	}
 
@@ -459,7 +454,7 @@ func currentIDTokenUser(c Context, jwt string, audiences []string, clientIDs []s
 
 	if verifyParsedToken(c, *parsedToken, audiences, clientIDs) {
 		return &user.User{
-			Email: *parsedToken.Email,
+			Email: parsedToken.Email,
 		}, nil
 	}
 

@@ -50,31 +50,18 @@ func TestGetToken(t *testing.T) {
 }
 
 func TestGetMaxAge(t *testing.T) {
-	tts := []struct {
-		age      string
-		expected int
-	}{
-		{"max-age=86400", 86400},
-		{"max-age = 7200, must-revalidate", 7200},
-		{"public, max-age= 3600", 3600},
-		{"max-age=-100", -100},
-		{"max-age = 0a1b, must-revalidate", 0},
-		{"public, max-age= short", 0},
-		{"s-maxage=86400", 0},
-		{"max=86400", 0},
-		{"public", 0},
-		{"", 0},
-	}
-
-	for i, tt := range tts {
-		out := getMaxAge(tt.age)
-		switch {
-		case out == nil && tt.expected > 0:
-			t.Errorf("%d: expected %d, got nil", i, tt.expected)
-		case out != nil && *out != tt.expected:
-			t.Errorf("%d: expected %d, got %d", i, tt.expected, *out)
-		}
-	}
+	verifyTT(t,
+		getMaxAge("max-age=86400"), 86400,
+		getMaxAge("max-age = 7200, must-revalidate"), 7200,
+		getMaxAge("public, max-age= 3600"), 3600,
+		getMaxAge("max-age=-100"), 0,
+		getMaxAge("max-age = 0a1b, must-revalidate"), 0,
+		getMaxAge("public, max-age= short"), 0,
+		getMaxAge("s-maxage=86400"), 0,
+		getMaxAge("max=86400"), 0,
+		getMaxAge("public"), 0,
+		getMaxAge(""), 0,
+	)
 }
 
 func TestGetCertExpirationTime(t *testing.T) {
@@ -83,9 +70,11 @@ func TestGetCertExpirationTime(t *testing.T) {
 		expected          time.Duration
 	}{
 		{"max-age=3600", "600", 3000 * time.Second},
+		{"max-age=600", "", 0},
+		{"max-age=300", "301", 0},
+		{"max-age=0", "0", 0},
 		{"", "600", 0},
-		{"max-age=3600", "", 0},
-		{"max-age=3600", "7200", 0},
+		{"", "", 0},
 	}
 
 	for i, tt := range tts {
@@ -93,12 +82,8 @@ func TestGetCertExpirationTime(t *testing.T) {
 		h.Set("cache-control", tt.cacheControl)
 		h.Set("age", tt.age)
 
-		out := getCertExpirationTime(h)
-		switch {
-		case out == nil && tt.expected > 0:
-			t.Errorf("%d: expected %v, got nil", i, tt.expected)
-		case out != nil && *out != tt.expected:
-			t.Errorf("%d: expected %v, got %v", i, tt.expected, *out)
+		if out := getCertExpirationTime(h); out != tt.expected {
+			t.Errorf("%d: expected %d, got %d", i, tt.expected, out)
 		}
 	}
 }
@@ -194,13 +179,13 @@ func TestGetCachedCertsCacheHit(t *testing.T) {
 	}{
 		{"", nil},
 		{"{}", &certsList{}},
-		{`{"keyvalues": [{}]}`, &certsList{[]certInfo{{}}}},
+		{`{"keyvalues": [{}]}`, &certsList{[]*certInfo{{}}}},
 		{`{"keyvalues": [
 	    	{"algorithm": "RS256",
 	    	 "exponent": "123",
 	    	 "keyid": "some-id",
 	    	 "modulus": "123"} ]}`,
-			&certsList{[]certInfo{{"RS256", "123", "some-id", "123"}}}},
+			&certsList{[]*certInfo{{"RS256", "123", "some-id", "123"}}}},
 	}
 	for i, tt := range tts {
 		cacheValue = []byte(tt.cacheValue)
@@ -421,14 +406,14 @@ func TestCurrentUser(t *testing.T) {
 		expectedEmail                string
 	}{
 		// success
-		{jwtStr, []string{EmailScope}, []string{*jwt.Audience}, []string{*jwt.ClientID}, *jwt.Email},
+		{jwtStr, []string{EmailScope}, []string{jwt.Audience}, []string{jwt.ClientID}, jwt.Email},
 		{"ya29.token", []string{EmailScope}, []string{clientId}, []string{clientId}, bearerEmail},
 		{"ya29.token", []string{EmailScope, validScope}, []string{clientId}, []string{clientId}, bearerEmail},
 		{"1/token", []string{validScope}, []string{clientId}, []string{clientId}, bearerEmail},
 
 		// failure
 		{jwtStr, []string{EmailScope}, []string{"other-client"}, []string{"other-client"}, ""},
-		{"some.invalid.jwt", []string{EmailScope}, []string{*jwt.Audience}, []string{*jwt.ClientID}, ""},
+		{"some.invalid.jwt", []string{EmailScope}, []string{jwt.Audience}, []string{jwt.ClientID}, ""},
 		{"", []string{validScope}, []string{clientId}, []string{clientId}, ""},
 		{"ya29.invalid", []string{"invalid.scope"}, []string{clientId}, []string{clientId}, ""},
 
