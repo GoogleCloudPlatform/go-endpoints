@@ -14,12 +14,12 @@ import (
 )
 
 var jwtValidTokenObject = signedJWT{
-	Audience: proto.String("my-client-id"),
-	ClientID: proto.String("hello-android"),
-	Email:    proto.String("dude@gmail.com"),
-	Expires:  proto.Int64(1370352252),
-	IssuedAt: proto.Int64(1370348652),
-	Issuer:   proto.String("accounts.google.com"),
+	Audience: "my-client-id",
+	ClientID: "hello-android",
+	Email:    "dude@gmail.com",
+	Expires:  1370352252,
+	IssuedAt: 1370348652,
+	Issuer:   "accounts.google.com",
 }
 
 // jwtValidTokenTime is a "timestamp" at which jwtValidTokenObject is valid
@@ -195,20 +195,12 @@ func TestVerifyParsedToken(t *testing.T) {
 	c := NewContext(r)
 
 	for i, tt := range tts {
-		jwt := signedJWT{}
-		if tt.issuer != "" {
-			jwt.Issuer = proto.String(tt.issuer)
+		jwt := signedJWT{
+			Issuer:   tt.issuer,
+			Audience: tt.audience,
+			ClientID: tt.clientId,
+			Email:    tt.email,
 		}
-		if tt.audience != "" {
-			jwt.Audience = proto.String(tt.audience)
-		}
-		if tt.clientId != "" {
-			jwt.ClientID = proto.String(tt.clientId)
-		}
-		if tt.email != "" {
-			jwt.Email = proto.String(tt.email)
-		}
-
 		out := verifyParsedToken(c, jwt, audiences, clientIds)
 		if tt.valid != out {
 			t.Errorf("%d: expected token to be valid? %v, got: %v",
@@ -226,23 +218,23 @@ func TestCurrentIDTokenUser(t *testing.T) {
 	defer deleteAppengineContext()
 	c := NewContext(r)
 
-	aud := []string{*jwtValidTokenObject.Audience, *jwtValidTokenObject.ClientID}
-	azp := []string{*jwtValidTokenObject.ClientID}
+	aud := []string{jwtValidTokenObject.Audience, jwtValidTokenObject.ClientID}
+	azp := []string{jwtValidTokenObject.ClientID}
 
 	jwtUnacceptedToken := signedJWT{
-		Audience: proto.String("my-other-client-id"),
-		ClientID: proto.String("my-other-client-id"),
-		Email:    proto.String("me@gmail.com"),
-		Expires:  proto.Int64(1370352252),
-		IssuedAt: proto.Int64(1370348652),
-		Issuer:   proto.String("accounts.google.com"),
+		Audience: "my-other-client-id",
+		ClientID: "my-other-client-id",
+		Email:    "me@gmail.com",
+		Expires:  1370352252,
+		IssuedAt: 1370348652,
+		Issuer:   "accounts.google.com",
 	}
 
 	tts := []struct {
 		token         *signedJWT
 		expectedEmail string
 	}{
-		{&jwtValidTokenObject, *jwtValidTokenObject.Email},
+		{&jwtValidTokenObject, jwtValidTokenObject.Email},
 		{&jwtUnacceptedToken, ""},
 		{nil, ""},
 	}
