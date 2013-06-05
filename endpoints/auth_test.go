@@ -303,18 +303,6 @@ func TestGetCachedCertsCacheMiss(t *testing.T) {
 	}
 }
 
-// func TestVerifyParsedToken(t *testing.T) {
-// 	t.Skip("TODO")
-// }
-
-// func TestCurrentIDTokenUser(t *testing.T) {
-// 	t.Skip("TODO")
-// }
-
-// func TestCurrentBearerTokenScope(t *testing.T) {
-// 	t.Skip("TODO")
-// }
-
 func TestCurrentBearerTokenUser(t *testing.T) {
 	var (
 		validScope    = "valid.scope"
@@ -390,5 +378,81 @@ func TestCurrentBearerTokenUser(t *testing.T) {
 	}
 }
 
-// func TestCurrentUser(t *testing.T) {
-// }
+func TestCurrentUser(t *testing.T) {
+	const (
+		clientId    = "my-client-id"
+		bearerEmail = "bearer@example.org"
+		validScope  = "valid.scope"
+	)
+
+	getOAuthRPC := func(in, out proto.Message, _ *tu.RpcCallOptions) error {
+		scope := in.(*user_pb.GetOAuthUserRequest).GetScope()
+		if scope != validScope && scope != EmailScope {
+			return fmt.Errorf("Invalid scope: %q", scope)
+		}
+		resp := out.(*user_pb.GetOAuthUserResponse)
+		resp.ClientId = proto.String(clientId)
+		resp.Email = proto.String(bearerEmail)
+		resp.AuthDomain = proto.String("example.org")
+		resp.UserId = proto.String("12345")
+		return nil
+	}
+	defer tu.RegisterAPIOverride("user", "GetOAuthUser", getOAuthRPC)()
+	// so that user.GetOAuthUser RPC is used for bearer tokens
+	tu.SetDevAppServer(false)
+	defer func() {
+		tu.SetDevAppServer(true)
+	}()
+
+	// stubs to make fake JWT token validations pass
+	defer stubMemcacheGetCerts()() // in jwt_test.go
+	origCurrentUTC := currentUTC
+	defer func() {
+		currentUTC = origCurrentUTC
+	}()
+	currentUTC = func() time.Time {
+		return jwtValidTokenTime
+	}
+
+	jwtStr, jwt := jwtValidTokenString, jwtValidTokenObject
+	tts := []struct {
+		token                        string
+		scopes, audiences, clientIDs []string
+		expectedEmail                string
+	}{
+		// success
+		{jwtStr, []string{EmailScope}, []string{*jwt.Audience}, []string{*jwt.ClientID}, *jwt.Email},
+		{"ya29.token", []string{EmailScope}, []string{clientId}, []string{clientId}, bearerEmail},
+		{"ya29.token", []string{EmailScope, validScope}, []string{clientId}, []string{clientId}, bearerEmail},
+		{"1/token", []string{validScope}, []string{clientId}, []string{clientId}, bearerEmail},
+
+		// failure
+		{jwtStr, []string{EmailScope}, []string{"other-client"}, []string{"other-client"}, ""},
+		{"some.invalid.jwt", []string{EmailScope}, []string{*jwt.Audience}, []string{*jwt.ClientID}, ""},
+		{"", []string{validScope}, []string{clientId}, []string{clientId}, ""},
+		{"ya29.invalid", []string{"invalid.scope"}, []string{clientId}, []string{clientId}, ""},
+
+		{"doesn't matter", nil, []string{clientId}, []string{clientId}, ""},
+		{"doesn't matter", []string{EmailScope}, nil, []string{clientId}, ""},
+		{"doesn't matter", []string{EmailScope}, []string{clientId}, nil, ""},
+	}
+
+	for i, tt := range tts {
+		req, deleteCtx := tu.NewTestRequest("GET", "/", nil)
+		defer deleteCtx()
+		c := NewContext(req)
+		if tt.token != "" {
+			req.Header.Set("authorization", "oauth "+tt.token)
+		}
+
+		user, err := CurrentUser(c, tt.scopes, tt.audiences, tt.clientIDs)
+		switch {
+		case tt.expectedEmail == "" && err == nil:
+			t.Errorf("%d: expected error, got %#v", i, user)
+		case tt.expectedEmail != "" && user == nil:
+			t.Errorf("%d: expected user object, got nil (%v)", i, err)
+		case tt.expectedEmail != "" && tt.expectedEmail != user.Email:
+			t.Errorf("%d: expected %q, got %q", i, tt.expectedEmail, user.Email)
+		}
+	}
+}

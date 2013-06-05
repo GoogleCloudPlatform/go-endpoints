@@ -1,8 +1,11 @@
 package endpoints
 
 import (
+	"errors"
 	"testing"
 	"time"
+
+	"appengine/memcache"
 
 	mc_pb "appengine_internal/memcache"
 	"code.google.com/p/goprotobuf/proto"
@@ -18,6 +21,10 @@ var jwtValidTokenObject = signedJWT{
 	IssuedAt: proto.Int64(1370348652),
 	Issuer:   proto.String("accounts.google.com"),
 }
+
+// jwtValidTokenTime is a "timestamp" at which jwtValidTokenObject is valid
+// (e.g. not expired or something)
+var jwtValidTokenTime = time.Date(2013, 6, 4, 13, 24, 15, 0, time.UTC)
 
 // header: {"alg": "RS256", "typ": "JWT"}
 // payload:
@@ -108,34 +115,42 @@ const googCerts = `{
 	}]
 }`
 
-func TestVerifySignedJwt(t *testing.T) {
-	mcGetStub := func(in, out proto.Message, _ *tu.RpcCallOptions) error {
+func stubMemcacheGetCerts() func() {
+	stub := func(in, out proto.Message, _ *tu.RpcCallOptions) error {
 		req := in.(*mc_pb.MemcacheGetRequest)
-		item := &mc_pb.MemcacheGetResponse_Item{
-			Key:   req.Key[0],
-			Value: []byte(googCerts),
+		if req.GetNameSpace() == certNamespace &&
+			len(req.Key) == 1 && string(req.Key[0]) == DefaultCertUri {
+
+			item := &mc_pb.MemcacheGetResponse_Item{
+				Key:   req.Key[0],
+				Value: []byte(googCerts),
+			}
+			resp := out.(*mc_pb.MemcacheGetResponse)
+			resp.Item = []*mc_pb.MemcacheGetResponse_Item{item}
+			return nil
 		}
-		resp := out.(*mc_pb.MemcacheGetResponse)
-		resp.Item = []*mc_pb.MemcacheGetResponse_Item{item}
-		return nil
+		return memcache.ErrCacheMiss
 	}
-	defer tu.RegisterAPIOverride("memcache", "Get", mcGetStub)()
+	return tu.RegisterAPIOverride("memcache", "Get", stub)
+}
+
+func TestVerifySignedJwt(t *testing.T) {
+	defer stubMemcacheGetCerts()()
 	r, deleteAppengineContext := tu.NewTestRequest("GET", "/", nil)
 	defer deleteAppengineContext()
 
-	now := time.Date(2013, 6, 4, 13, 24, 15, 0, time.UTC)
 	tts := []struct {
 		token    string
 		now      time.Time
 		expected *signedJWT
 	}{
-		{jwtValidTokenString, now, &jwtValidTokenObject},
-		{jwtValidTokenString, now.Add(time.Hour * 24), nil},
-		{jwtValidTokenString, now.Add(-time.Hour * 24), nil},
-		{jwtInvalidKeyToken, now, nil},
-		{jwtInvalidAlgToken, now, nil},
-		{"invalid.token", now, nil},
-		{"another.invalid.token", now, nil},
+		{jwtValidTokenString, jwtValidTokenTime, &jwtValidTokenObject},
+		{jwtValidTokenString, jwtValidTokenTime.Add(time.Hour * 24), nil},
+		{jwtValidTokenString, jwtValidTokenTime.Add(-time.Hour * 24), nil},
+		{jwtInvalidKeyToken, jwtValidTokenTime, nil},
+		{jwtInvalidAlgToken, jwtValidTokenTime, nil},
+		{"invalid.token", jwtValidTokenTime, nil},
+		{"another.invalid.token", jwtValidTokenTime, nil},
 	}
 
 	c := NewContext(r)
@@ -144,11 +159,114 @@ func TestVerifySignedJwt(t *testing.T) {
 		jwt, err := verifySignedJwt(c, tt.token, tt.now.Unix())
 		switch {
 		case err != nil && tt.expected != nil:
-			t.Errorf("%d: didn't expected error: %v", i, err)
+			t.Errorf("%d: didn't expect error: %v", i, err)
 		case err == nil && tt.expected == nil:
 			t.Errorf("%d: expected error, got: %#v", i, jwt)
 		case err == nil && tt.expected != nil:
 			assertEquals(t, i, jwt, tt.expected)
+		}
+	}
+}
+
+func TestVerifyParsedToken(t *testing.T) {
+	const (
+		goog     = "accounts.google.com"
+		clientId = "my-client-id"
+		email    = "dude@gmail.com"
+	)
+	audiences := []string{clientId, "hello-android"}
+	clientIds := []string{clientId}
+
+	tts := []struct {
+		issuer, audience, clientId, email string
+		valid                             bool
+	}{
+		{goog, clientId, clientId, email, true},
+		{goog, "hello-android", clientId, email, true},
+		{goog, "invalid", clientId, email, false},
+		{goog, clientId, "invalid", email, false},
+		{goog, clientId, clientId, "", false},
+		{"", clientId, clientId, email, false},
+	}
+
+	r, deleteCtx := tu.NewTestRequest("GET", "/", nil)
+	defer deleteCtx()
+
+	c := NewContext(r)
+
+	for i, tt := range tts {
+		jwt := signedJWT{}
+		if tt.issuer != "" {
+			jwt.Issuer = proto.String(tt.issuer)
+		}
+		if tt.audience != "" {
+			jwt.Audience = proto.String(tt.audience)
+		}
+		if tt.clientId != "" {
+			jwt.ClientID = proto.String(tt.clientId)
+		}
+		if tt.email != "" {
+			jwt.Email = proto.String(tt.email)
+		}
+
+		out := verifyParsedToken(c, jwt, audiences, clientIds)
+		if tt.valid != out {
+			t.Errorf("%d: expected token to be valid? %v, got: %v",
+				i, tt.valid, out)
+		}
+	}
+}
+
+func TestCurrentIDTokenUser(t *testing.T) {
+	jwtOrigParser := jwtParser
+	defer func() {
+		jwtParser = jwtOrigParser
+	}()
+	r, deleteAppengineContext := tu.NewTestRequest("GET", "/", nil)
+	defer deleteAppengineContext()
+	c := NewContext(r)
+
+	aud := []string{*jwtValidTokenObject.Audience, *jwtValidTokenObject.ClientID}
+	azp := []string{*jwtValidTokenObject.ClientID}
+
+	jwtUnacceptedToken := signedJWT{
+		Audience: proto.String("my-other-client-id"),
+		ClientID: proto.String("my-other-client-id"),
+		Email:    proto.String("me@gmail.com"),
+		Expires:  proto.Int64(1370352252),
+		IssuedAt: proto.Int64(1370348652),
+		Issuer:   proto.String("accounts.google.com"),
+	}
+
+	tts := []struct {
+		token         *signedJWT
+		expectedEmail string
+	}{
+		{&jwtValidTokenObject, *jwtValidTokenObject.Email},
+		{&jwtUnacceptedToken, ""},
+		{nil, ""},
+	}
+
+	var currToken *signedJWT
+
+	jwtParser = func(Context, string, int64) (*signedJWT, error) {
+		if currToken == nil {
+			return nil, errors.New("Fake verification failed")
+		}
+		return currToken, nil
+	}
+
+	for i, tt := range tts {
+		currToken = tt.token
+		user, err := currentIDTokenUser(c,
+			jwtValidTokenString, aud, azp, jwtValidTokenTime.Unix())
+		switch {
+		case tt.expectedEmail != "" && err != nil:
+			t.Errorf("%d: unexpected error: %v", i, err)
+		case tt.expectedEmail == "" && err == nil:
+			t.Errorf("%d: expected error, got: %#v", i, user)
+		case err == nil && tt.expectedEmail != user.Email:
+			t.Errorf("%d: expected %q, got %q", i, tt.expectedEmail, user.Email)
 		}
 	}
 }
