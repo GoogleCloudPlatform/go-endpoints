@@ -498,10 +498,6 @@ func CurrentBearerTokenUser(c Context, scopes []string, clientIDs []string) (*us
 		return nil, err
 	}
 
-	// TODO(dhermes): If appengine.IsDevAppServer(), use the tokeninfo API, which is
-	//                a POST to
-	//                https://www.googleapis.com/oauth2/v2/tokeninfo?access_token=$TOKEN
-	//                where $TOKEN is parsed from the Authorization header.
 	return c.CurrentOAuthUser(scope)
 }
 
@@ -544,4 +540,12 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 
 	c.Infof("Checking for Bearer token.")
 	return CurrentBearerTokenUser(c, scopes, clientIDs)
+}
+
+func init() {
+	if appengine.IsDevAppServer() {
+		ContextFactory = tokeninfoContextFactory
+	} else {
+		ContextFactory = cachingContextFactory
+	}
 }

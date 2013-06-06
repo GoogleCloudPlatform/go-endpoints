@@ -319,7 +319,7 @@ func TestCurrentBearerTokenUser(t *testing.T) {
 
 	req, deleteAppengineCtx := tu.NewTestRequest("GET", "/", nil)
 	defer deleteAppengineCtx()
-	c := NewContext(req)
+	c := cachingContextFactory(req)
 
 	tt := []*struct {
 		scopes    []string
@@ -383,11 +383,6 @@ func TestCurrentUser(t *testing.T) {
 		return nil
 	}
 	defer tu.RegisterAPIOverride("user", "GetOAuthUser", getOAuthRPC)()
-	// so that user.GetOAuthUser RPC is used for bearer tokens
-	tu.SetDevAppServer(false)
-	defer func() {
-		tu.SetDevAppServer(true)
-	}()
 
 	// stubs to make fake JWT token validations pass
 	defer stubMemcacheGetCerts()() // in jwt_test.go
@@ -425,7 +420,7 @@ func TestCurrentUser(t *testing.T) {
 	for i, tt := range tts {
 		req, deleteCtx := tu.NewTestRequest("GET", "/", nil)
 		defer deleteCtx()
-		c := NewContext(req)
+		c := cachingContextFactory(req)
 		if tt.token != "" {
 			req.Header.Set("authorization", "oauth "+tt.token)
 		}
