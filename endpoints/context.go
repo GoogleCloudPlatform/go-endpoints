@@ -32,6 +32,7 @@ import (
 
 type cachingContext struct {
 	appengine.Context
+	r *http.Request
 	// map keys are scopes
 	oauthResponseCache map[string]*pb.GetOAuthUserResponse
 	// mutex for oauthResponseCache
@@ -71,6 +72,11 @@ func getOAuthResponse(c *cachingContext, scope string) (*pb.GetOAuthUserResponse
 	return res, nil
 }
 
+// HttpRequest returns the request associated with this context.	
+func (c *cachingContext) HttpRequest() *http.Request {
+	return c.r
+}
+
 // CurrentOAuthClientID returns a clientId associated with the scope.
 func (c *cachingContext) CurrentOAuthClientID(scope string) (string, error) {
 	res, err := getOAuthResponse(c, scope)
@@ -105,7 +111,7 @@ func cachingContextFactory(r *http.Request) Context {
 	// then there's nothing else to do here.
 	// (was: Fail if ctx is nil.)
 	ac := appengine.NewContext(r)
-	return &cachingContext{ac, map[string]*pb.GetOAuthUserResponse{}, sync.Mutex{}}
+	return &cachingContext{ac, r, map[string]*pb.GetOAuthUserResponse{}, sync.Mutex{}}
 }
 
 func init() {

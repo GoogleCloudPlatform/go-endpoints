@@ -68,6 +68,9 @@ var (
 type Context interface {
 	appengine.Context
 
+	// HttpRequest returns the request associated with this context.	
+	HttpRequest() *http.Request
+
 	// CurrentOAuthClientID returns a clientId associated with the scope.
 	CurrentOAuthClientID(scope string) (string, error)
 
@@ -518,12 +521,7 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 		return nil, errors.New("No client ID or scope info provided.")
 	}
 
-	req, ok := c.Request().(*http.Request)
-	if !ok {
-		return nil, errors.New("No request exists in the context.")
-	}
-
-	token := getToken(req)
+	token := getToken(c.HttpRequest())
 	if token == "" {
 		return nil, errors.New("No token in the current context.")
 	}
