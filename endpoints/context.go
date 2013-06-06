@@ -113,7 +113,3 @@ func cachingContextFactory(r *http.Request) Context {
 	ac := appengine.NewContext(r)
 	return &cachingContext{ac, r, map[string]*pb.GetOAuthUserResponse{}, sync.Mutex{}}
 }
-
-func init() {
-	ContextFactory = cachingContextFactory
-}
