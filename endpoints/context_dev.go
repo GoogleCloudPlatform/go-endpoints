@@ -81,11 +81,7 @@ func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
 // getScopedTokeninfo validates fetched token by matching tokeinfo.Scope
 // with scope arg.
 func getScopedTokeninfo(c Context, scope string) (*tokeninfo, error) {
-	req, ok := c.Request().(*http.Request)
-	if !ok {
-		return nil, errors.New("No request in context")
-	}
-	token := getToken(req)
+	token := getToken(c.HttpRequest())
 	if token == "" {
 		return nil, errors.New("No token found")
 	}
@@ -105,6 +101,11 @@ func getScopedTokeninfo(c Context, scope string) (*tokeninfo, error) {
 // A context that uses tokeninfo API to validate bearer token
 type tokeninfoContext struct {
 	appengine.Context
+	r *http.Request
+}
+
+func (c *tokeninfoContext) HttpRequest() *http.Request {
+	return c.r
 }
 
 // CurrentOAuthClientID returns a clientId associated with the scope.
@@ -132,5 +133,5 @@ func (c *tokeninfoContext) CurrentOAuthUser(scope string) (*user.User, error) {
 // To be used as auth.go/ContextFactory.
 func tokeninfoContextFactory(r *http.Request) Context {
 	ac := appengine.NewContext(r)
-	return &tokeninfoContext{ac}
+	return &tokeninfoContext{ac, r}
 }
