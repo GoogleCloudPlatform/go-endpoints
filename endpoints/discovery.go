@@ -111,6 +111,14 @@ func newDiscoveryService(server *Server, backend *BackendService) *DiscoveryServ
 	return s
 }
 
+
+func setupDiscoveryServiceMethods(api *RpcService) {
+	info := api.MethodByName("List").Info()
+	info.HttpMethod, info.Path, info.Desc =
+		"GET", "apis", "List all apis."
+}
+
+
 func (s *DiscoveryService) directoryItemFromApiConfig(api *ApiDescriptor) (d *DiscoveryDirectoryItem) {
 	d = NewDiscoveryDirectoryItem()
 
@@ -179,7 +187,7 @@ func (s *DiscoveryService) GetRest(
 	return nil
 }
 
-func (s *DiscoveryService) GetDiscovery(
+func (s *DiscoveryService) List(
 	r *http.Request, _ *VoidMessage, resp *DiscoveryDirectoryList) error {
 
 	apiReq := GetApiConfigsRequest{}

@@ -7,7 +7,6 @@ package endpoints
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
@@ -79,10 +78,11 @@ func NewServer(root string, registerBackend bool) *Server {
 		server.services.register(backend, "BackendService", "", "", true, true)
 	} else {
 		discovery := newDiscoveryService(server, backend)
-		_, err := server.services.register(discovery, "discovery", "v1", "Discovery API", true, true)
+		api, err := server.services.register(discovery, "discovery", "v1", "Discovery API", true, false)
 		if err != nil {
 			panic(err)
 		}
+		setupDiscoveryServiceMethods(api)
 	}
 	return server
 }
@@ -134,26 +134,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Mainly for debug logging
 	c := appengine.NewContext(r)
 
-	path := strings.Trim(r.URL.Path, "/")
-	c.Debugf("Path: %s", path)
-	c.Debugf("Services: %v", s.services)
+	// Split off the prefix from our path so we can find the methodName
+	parts := strings.SplitN(r.URL.Path, s.root, 2)
+	path := strings.Trim(parts[1], "/")
 
 	// Always respond with JSON, even when an error occurs.
 	// Note: API server doesn't expect an encoding in Content-Type header.
 	w.Header().Set("Content-Type", "application/json")
 
-	// methodName has "ServiceName.MethodName" format.
-	var methodName string
-	if idx := strings.LastIndex(r.URL.Path, "/v1/apis"); idx < 0 {
-		writeError(w, fmt.Errorf("rpc: no method in path %q", r.URL.Path))
-		return
-	} else {
-		methodName = r.URL.Path[idx+1:]
-		c.Debugf("methodName: %s", methodName)
-	}
-
 	// Get service method specs
-	serviceSpec, methodSpec, err := s.services.getByPath(methodName)
+	serviceSpec, methodSpec, err := s.services.getByPath(path)
 	if err != nil {
 		writeError(w, err)
 		return
