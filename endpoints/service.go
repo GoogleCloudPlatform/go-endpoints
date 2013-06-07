@@ -265,9 +265,7 @@ func (m *serviceMap) get(method string) (*RpcService, *ServiceMethod, error) {
 	}
 	parts[1] = strings.Title(parts[1])
 
-	m.mutex.Lock()
-	service := m.services[parts[0]]
-	m.mutex.Unlock()
+	service := m.serviceByName(parts[2])
 	if service == nil {
 		err := fmt.Errorf("endpoints: can't find service %q", parts[0])
 		return nil, nil, err
@@ -279,6 +277,12 @@ func (m *serviceMap) get(method string) (*RpcService, *ServiceMethod, error) {
 		return nil, nil, err
 	}
 	return service, ServiceMethod, nil
+}
+
+func (m *serviceMap) getByPath(servicePath string) (*RpcService, *ServiceMethod, error) {
+	service := m.serviceByName("DiscoveryService")
+	method := service.methods["GetDiscovery"]
+	return service, method, nil
 }
 
 // serviceByName returns a registered service or nil if there's no service

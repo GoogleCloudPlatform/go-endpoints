@@ -65,7 +65,7 @@ type Server struct {
 }
 
 // NewServer returns a new RPC server.
-func NewServer(root string) *Server {
+func NewServer(root string, registerBackend bool) *Server {
 	if root == "" {
 		root = "/_ah/spi/"
 	} else if root[len(root)-1] != '/' {
@@ -73,8 +73,17 @@ func NewServer(root string) *Server {
 	}
 
 	server := &Server{root: root, services: new(serviceMap)}
+	// Don't register backend if we aren't using endpoints on GAE
 	backend := newBackendService(server)
-	server.services.register(backend, "BackendService", "", "", true, true)
+	if registerBackend {
+		server.services.register(backend, "BackendService", "", "", true, true)
+	} else {
+		discovery := newDiscoveryService(server, backend)
+		_, err := server.services.register(discovery, "discovery", "v1", "Discovery API", true, true)
+		if err != nil {
+			panic(err)
+		}
+	}
 	return server
 }
 
@@ -125,27 +134,26 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Mainly for debug logging
 	c := appengine.NewContext(r)
 
+	path := strings.Trim(r.URL.Path, "/")
+	c.Debugf("Path: %s", path)
+	c.Debugf("Services: %v", s.services)
+
 	// Always respond with JSON, even when an error occurs.
 	// Note: API server doesn't expect an encoding in Content-Type header.
 	w.Header().Set("Content-Type", "application/json")
 
-	if r.Method != "POST" {
-		err := fmt.Errorf("rpc: POST method required, got %q", r.Method)
-		writeError(w, err)
-		return
-	}
-
 	// methodName has "ServiceName.MethodName" format.
 	var methodName string
-	if idx := strings.LastIndex(r.URL.Path, "/"); idx < 0 {
+	if idx := strings.LastIndex(r.URL.Path, "/v1/apis"); idx < 0 {
 		writeError(w, fmt.Errorf("rpc: no method in path %q", r.URL.Path))
 		return
 	} else {
 		methodName = r.URL.Path[idx+1:]
+		c.Debugf("methodName: %s", methodName)
 	}
 
 	// Get service method specs
-	serviceSpec, methodSpec, err := s.services.get(methodName)
+	serviceSpec, methodSpec, err := s.services.getByPath(methodName)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -165,10 +173,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 	writeError(w, fmt.Errorf("Error while decoding JSON: %q", err))
 	// 	return
 	// }
+/*
 	if err := json.Unmarshal(body, req.Interface()); err != nil {
 		writeError(w, err)
 		return
 	}
+*/
 
 	// Initialize RPC method response and call method's function
 	resp := reflect.New(methodSpec.RespType)
@@ -222,5 +232,5 @@ func HandleHttp() {
 // TODO: var DefaultServer = NewServer("") won't work so it's in the init()
 // function for now.
 func init() {
-	DefaultServer = NewServer("")
+	DefaultServer = NewServer("", true)
 }
