@@ -1,6 +1,7 @@
 package endpoints
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -219,8 +220,6 @@ func (md *ApiMethodDescriptor) toApiMethod(rosySrv string) (*ApiMethod, error) {
 // addSchemaFromType creates a new ApiSchemaDescriptor from given Type t
 // and adds it to the map with the key of type's name name.
 // 
-// If t Kind is a struct which has nested structs then... what happens then?
-// 
 // Returns an error if ApiSchemaDescriptor cannot be created from this Type.
 func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) error {
 	if t.Name() == "" {
@@ -242,18 +241,23 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) erro
 		sd.Properties = make(map[string]*ApiSchemaProperty, len(fieldsMap))
 		sd.Type = "object"
 		for name, field := range fieldsMap {
+			fkind := field.Type.Kind()
 			prop := &ApiSchemaProperty{}
 
 			// TODO(alex): add support for reflect.Map?
-			switch field.Type.Kind() {
+			switch {
 			default:
 				prop.Type, prop.Format = typeToPropFormat(field.Type)
 
-			case reflect.Ptr, reflect.Struct:
+			case implements(field.Type, typeOfJsonMarshaler):
+				prop.Type = "string"
+
+			case fkind == reflect.Ptr, fkind == reflect.Struct:
 				typ := indirectType(field.Type)
 				switch {
 				case typ == typeOfTime:
 					prop.Type, prop.Format = "string", "date-time"
+
 				case typ.Kind() == reflect.Struct:
 					prop.Ref = typ.Name()
 					ensureSchemas[prop.Ref] = typ
@@ -263,7 +267,7 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) erro
 						field.Type, sd.Id, name)
 				}
 
-			case reflect.Slice:
+			case fkind == reflect.Slice:
 				if field.Type == typeOfBytes {
 					prop.Type, prop.Format = "string", "byte"
 					break
@@ -339,9 +343,15 @@ func (info *MethodInfo) isBodiless() bool {
 // anything in a request (or a response).
 type VoidMessage struct{}
 
+type jsonMarshaler interface {
+	json.Marshaler
+	json.Unmarshaler
+}
+
 var (
-	typeOfTime  = reflect.TypeOf(time.Time{})
-	typeOfBytes = reflect.TypeOf([]byte(nil))
+	typeOfTime          = reflect.TypeOf(time.Time{})
+	typeOfBytes         = reflect.TypeOf([]byte(nil))
+	typeOfJsonMarshaler = reflect.TypeOf((*jsonMarshaler)(nil)).Elem()
 )
 
 // indirectType returns a type the t is pointing to or a type of the element
@@ -357,6 +367,11 @@ func indirectType(t reflect.Type) reflect.Type {
 // indirectKind returns kind of a type the t is pointing to.
 func indirectKind(t reflect.Type) reflect.Kind {
 	return indirectType(t).Kind()
+}
+
+// implements returns true if Type t implements interface of Type impl.
+func implements(t reflect.Type, impl reflect.Type) bool {
+	return t.Implements(impl) || indirectType(t).Implements(impl)
 }
 
 // isEmptyStruct returns true if given Type is either not a Struct or
@@ -481,10 +496,10 @@ func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err e
 		p.Type = "double"
 	case kind == reflect.Bool:
 		p.Type = "boolean"
-	case kind == reflect.String:
-		p.Type = "string"
 	case field.Type == typeOfBytes:
 		p.Type = "bytes"
+	case kind == reflect.String, implements(field.Type, typeOfJsonMarshaler):
+		p.Type = "string"
 	default:
 		return nil, fmt.Errorf("Unsupported field: %#v", field)
 	}
@@ -521,6 +536,7 @@ func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err e
 func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
 	numField := t.NumField()
 	m := make(map[string]*reflect.StructField, numField)
+
 	for i := 0; i < numField; i++ {
 		f := t.Field(i)
 		// consider only exported fields
@@ -535,14 +551,18 @@ func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
 			name = f.Name
 		}
 
-		if flatten && indirectKind(f.Type) == reflect.Struct {
+		if flatten && indirectKind(f.Type) == reflect.Struct &&
+			!implements(f.Type, typeOfJsonMarshaler) {
+
 			for nname, nfield := range fieldNames(indirectType(f.Type), true) {
 				m[name+"."+nname] = nfield
 			}
-		} else {
-			m[name] = &f
+			continue
 		}
+
+		m[name] = &f
 	}
+
 	return m
 }
 

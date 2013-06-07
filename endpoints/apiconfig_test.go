@@ -1,8 +1,10 @@
 package endpoints
 
 import (
+	"encoding/json"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -20,6 +22,29 @@ var (
 	audiences  = []string{dummyAudience}
 )
 
+type canMarshal struct {
+	name string
+}
+
+func (m *canMarshal) MarshalJSON() ([]byte, error) {
+	return []byte("Hello, " + m.name), nil
+}
+
+func (m *canMarshal) UnmarshalJSON(b []byte) error {
+	parts := strings.SplitN(string(b), " ", 2)
+	if len(parts) > 1 {
+		m.name = parts[1]
+	} else {
+		m.name = parts[0]
+	}
+	return nil
+}
+
+// make sure canMarshal type implements json.Marshaler and json.Unmarshaler
+// interfaces
+var _ = json.Marshaler((*canMarshal)(nil))
+var _ = json.Unmarshaler((*canMarshal)(nil))
+
 type DummyMsg struct {
 	String    string  `json:"str" endpoints:"req,desc=A string field"`
 	Int       int     `json:"i" endpoints:"min=-200,max=200,d=-100"`
@@ -31,11 +56,17 @@ type DummyMsg struct {
 	BoolField bool    `json:"bool_field" endpoints:"d=true"`
 	Bytes     []byte
 	Internal  string `json:"-"`
+	Marshal   *canMarshal
 }
 
 type DummySubMsg struct {
 	Simple  string    `json:"simple" endpoints:"d=Hello gopher"`
 	Message *DummyMsg `json:"msg"`
+}
+
+type DummyListReq struct {
+	Limit  int         `json:"limit" endpoints:"d=10,max=100"`
+	Cursor *canMarshal `json:"cursor"`
 }
 
 type DummyListMsg struct {
@@ -57,7 +88,7 @@ func (s *DummyService) GetSub(*http.Request, *DummySubMsg, *DummyMsg) error {
 	return nil
 }
 
-func (s *DummyService) GetList(*http.Request, *VoidMessage, *DummyListMsg) error {
+func (s *DummyService) GetList(*http.Request, *DummyListReq, *DummyListMsg) error {
 	return nil
 }
 
@@ -218,6 +249,7 @@ func TestApiGetSubMethod(t *testing.T) {
 		{"msg.Float64", "double", false, 123.456, nil, nil, false, 0},
 		{"msg.bool_field", "boolean", false, true, nil, nil, false, 0},
 		{"msg.Bytes", "bytes", false, nil, nil, nil, false, 0},
+		{"msg.Marshal", "string", false, nil, nil, nil, false, 0},
 	}
 
 	for _, tt := range tts {
@@ -260,8 +292,34 @@ func TestApiGetListMethod(t *testing.T) {
 		len(meth.Scopes), 0,
 		len(meth.Audiences), 0,
 		len(meth.ClientIds), 0,
-		len(meth.Request.Params), 0,
 	)
+
+	params := meth.Request.Params
+	tts := [][]interface{}{
+		{"limit", "int32", false, 10, nil, 100, false, 0},
+		{"cursor", "string", false, nil, nil, nil, false, 0},
+	}
+
+	for _, tt := range tts {
+		name := tt[0].(string)
+		p := params[name]
+		if p == nil {
+			t.Errorf("Couldn't find %q param in %v", name, params)
+			continue
+		}
+		verifyTT(t,
+			p.Type, tt[1],
+			p.Required, tt[2],
+			p.Default, tt[3],
+			p.Min, tt[4],
+			p.Max, tt[5],
+			p.Repeated, tt[6],
+			len(p.Enum), tt[7],
+		)
+	}
+	if lp, ltts := len(params), len(tts); lp != ltts {
+		t.Errorf("Expected %d params for %q, got %d", ltts, meth.RosyMethod, lp)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -326,6 +384,7 @@ func TestDummyMsgSchema(t *testing.T) {
 		{"Float64", "number", "double", false, float64(123.456), "", ""},
 		{"bool_field", "boolean", "", false, true, "", ""},
 		{"Bytes", "string", "byte", false, nil, "", ""},
+		{"Marshal", "string", "", false, nil, "", ""},
 	}
 
 	verifySchema(t, "DummyMsg", props)
@@ -409,11 +468,13 @@ func TestFieldNamesSimple(t *testing.T) {
 		Age        int
 		unexported string
 		Internal   string `json:"-"`
+		Marshal    *canMarshal
 	}{}
 
 	m := fieldNames(reflect.TypeOf(s), true)
+	names := []string{"name", "Age", "Marshal"}
 
-	for _, k := range []string{"name", "Age"} {
+	for _, k := range names {
 		field, exists := m[k]
 		switch {
 		case !exists:
@@ -422,8 +483,8 @@ func TestFieldNamesSimple(t *testing.T) {
 			t.Errorf("Expected non-nil field %q", k)
 		}
 	}
-	if len(m) != 2 {
-		t.Errorf("Expected 2 elements, got %d", len(m))
+	if len(m) != len(names) {
+		t.Errorf("Expected %d elements, got %d", len(names), len(m))
 	}
 }
 
