@@ -30,6 +30,7 @@ type DummyMsg struct {
 	Float64   float64 `endpoints:"d=123.456"`
 	BoolField bool    `json:"bool_field" endpoints:"d=true"`
 	Bytes     []byte
+	Internal  string `json:"-"`
 }
 
 type DummySubMsg struct {
@@ -407,6 +408,7 @@ func TestFieldNamesSimple(t *testing.T) {
 		Name       string `json:"name"`
 		Age        int
 		unexported string
+		Internal   string `json:"-"`
 	}{}
 
 	m := fieldNames(reflect.TypeOf(s), true)

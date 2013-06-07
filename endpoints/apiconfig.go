@@ -514,7 +514,7 @@ func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err e
 // field tag. Defaults to StructField.Name.
 // 
 // It expands (flattens) nexted structs if flatten == true, and always skips
-// unexported fields.
+// unexported fields or thosed tagged with json:"-"
 // 
 // This method accepts only reflect.Struct type. Passing other types will
 // most likely make it panic.
@@ -529,7 +529,9 @@ func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
 		}
 
 		name := strings.Split(f.Tag.Get("json"), ",")[0]
-		if name == "" {
+		if name == "-" {
+			continue
+		} else if name == "" {
 			name = f.Name
 		}
 
