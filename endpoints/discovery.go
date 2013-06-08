@@ -2,7 +2,9 @@ package endpoints
 
 import (
 	"fmt"
+	"errors"
 	"strings"
+	"path"
 	"net/http"
 )
 
@@ -74,17 +76,6 @@ type DiscoveryResourceMethod struct {
 
 // Creates a new DiscoveryRestDescription with some default values
 func NewDiscoveryRestDescription(rootUrl string, servicePath string) (d *DiscoveryRestDescription) {
-	d = &DiscoveryRestDescription{}
-	d.Kind = "discovery#restDescription"
-	d.DiscoveryVersion = "v1"
-	d.Protocol = "rest"
-	d.Resources = make(map[string]*DiscoveryResource)
-	d.Icons = make(map[string]string)
-	d.RootUrl = rootUrl
-	d.ServicePath = servicePath
-
-	d.BasePath = servicePath
-	d.BaseUrl = rootUrl
 	return d
 }
 
@@ -111,11 +102,14 @@ func newDiscoveryService(server *Server, backend *BackendService) *DiscoveryServ
 	return s
 }
 
-
 func setupDiscoveryServiceMethods(api *RpcService) {
 	info := api.MethodByName("List").Info()
 	info.HttpMethod, info.Path, info.Desc =
 		"GET", "apis", "List all apis."
+
+	info = api.MethodByName("GetRest").Info()
+	info.HttpMethod, info.Path, info.Desc =
+		"GET", "api/{api}/{version}/rest", "List all apis."
 }
 
 
@@ -134,8 +128,18 @@ func (s *DiscoveryService) directoryItemFromApiConfig(api *ApiDescriptor) (d *Di
 	return d
 }
 
-func (s *DiscoveryService) descriptionFromApiConfig(api *ApiDescriptor) (d *DiscoveryRestDescription) {
-	d = NewDiscoveryRestDescription(s.rootUrl, s.servicePath)
+func (s *DiscoveryService) descriptionFromApiConfig(api *ApiDescriptor, d *DiscoveryRestDescription) {
+	d.Kind = "discovery#restDescription"
+	d.DiscoveryVersion = "v1"
+	d.Protocol = "rest"
+	d.Resources = make(map[string]*DiscoveryResource)
+	d.Icons = make(map[string]string)
+	d.RootUrl = s.rootUrl
+	d.ServicePath = s.servicePath
+
+	d.BasePath = s.servicePath
+	d.BaseUrl = s.rootUrl
+
 	d.DefaultVersion = true
 
 	d.Description = api.Desc
@@ -168,21 +172,22 @@ func (s *DiscoveryService) descriptionFromApiConfig(api *ApiDescriptor) (d *Disc
 }
 
 type GetRestRequest struct {
+	Api string `endpoints:"required"`
+	Version string `endpoints:"required"`
 }
 
 // HandleApiRestDescription handles a request for a restDescription document
 func (s *DiscoveryService) GetRest(
 	r *http.Request, req *GetRestRequest, disc *DiscoveryRestDescription) error {
-	for _, service := range s.server.services.services {
-		if service.internal {
-			continue
-		}
-		d := &ApiDescriptor{}
-		if err := service.ApiDescriptor(d, r.Host); err != nil {
-			return err
-		}
-		disc = s.descriptionFromApiConfig(d)
+	service := s.server.services.servicePaths[path.Join(req.Api, req.Version)]
+	if service == nil || service.internal {
+		return errors.New("Invalid service")
 	}
+	d := &ApiDescriptor{}
+	if err := service.ApiDescriptor(d, r.Host); err != nil {
+		return err
+	}
+	s.descriptionFromApiConfig(d, disc)
 
 	return nil
 }

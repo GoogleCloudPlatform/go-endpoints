@@ -93,6 +93,7 @@ type MethodInfo struct {
 	// name can also contain resource, e.g. "greets.list"
 	Name       string
 	Path       string
+	PathRegex  *routeRegexp
 	HttpMethod string
 	Scopes     []string
 	Audiences  []string
@@ -291,39 +292,70 @@ func (m *serviceMap) get(method string) (*RpcService, *ServiceMethod, error) {
 	return service, ServiceMethod, nil
 }
 
-func (m *serviceMap) getByPath(servicePath string) (*RpcService, *ServiceMethod, error) {
-	var serviceName, version, methodName string
+func (m *serviceMap) getByPath(r *http.Request, servicePath string) (*RpcService, *ServiceMethod,*pathVars, error) {
+	var serviceName, version, methodPath string
 	var method *ServiceMethod
-	parts := strings.Split(servicePath, "/")
+	var vars *pathVars
+	parts := strings.SplitN(servicePath, "/", 3)
 
-	if len(parts) >= 3 {
+	if len(parts) == 3 {
 		serviceName = parts[0]
 		version = parts[1]
-		methodName = parts[2]
+		methodPath = parts[2]
 	}
 
 	service := m.serviceByPath(path.Join(serviceName, version))
 	if service == nil {
 		err := fmt.Errorf(
 			"endpoints: can't find service %q", serviceName)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// TODO: Figure out a better way to do this and take into account variables in path
-	for _, m := range service.methods {
-		if m.info.Path == parts[2] {
-			method = m
+	for _, v := range service.methods {
+		if matched, mvars := m.matchPath(r, v, methodPath); matched {
+			method = v
+			vars = mvars
+			break
 		}
 	}
 
 	if method == nil {
 		err := fmt.Errorf(
-			"endpoints: can't find method %q of service %q", methodName, serviceName)
-		return nil, nil, err
+			"endpoints: can't find method %q of service %q", methodPath, serviceName)
+		return nil, nil, nil, err
 	}
 
-	return service, method, nil
+	return service, method, vars, nil
 }
+
+type pathVars map[string]string
+
+// Match matches the route against the request.
+func (m *serviceMap) matchPath(r *http.Request, method *ServiceMethod, path string) (bool, *pathVars) {
+	info := method.info
+	regex := info.PathRegex
+
+	// TODO: the current go-endpoints API could be abused to change
+	// info.Path after we make this regex object
+	if regex == nil {
+		reg, err := newRouteRegexp(info.Path)
+		if err != nil {
+			panic(err)
+		}
+		regex = reg
+	}
+
+	// Match everything.
+	if matched := regex.Match(path); !matched {
+		return false, nil
+	}
+
+	vars := make(pathVars)
+	regex.extractVars(path, &vars)
+	return true, &vars
+}
+
 
 // serviceByName returns a registered service or nil if there's no service
 // registered by that name.
@@ -356,3 +388,4 @@ func isExportedOrBuiltin(t reflect.Type) bool {
 	// so we need to check the type name as well.
 	return isExported(t.Name()) || t.PkgPath() == ""
 }
+

@@ -143,7 +143,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get service method specs
-	serviceSpec, methodSpec, err := s.services.getByPath(path)
+	serviceSpec, methodSpec, vars, err := s.services.getByPath(r, path)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -151,6 +151,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Initialize RPC method request
 	req := reflect.New(methodSpec.ReqType)
+
+	for k, v := range *vars {
+		titleKey := strings.Title(k)
+		field := reflect.Indirect(req).FieldByName(titleKey)
+
+		// Only accept strings as the target for path arguments
+		if field.Kind() != reflect.String {
+			continue
+		}
+		
+		field.SetString(v)
+	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
