@@ -1,8 +1,7 @@
 // This implementation of Context interface uses tokeninfo API to validate
 // bearer token.
 // 
-// It is intended to use on dev server but will work on production too, although
-// it probably won't make as much sense.
+// It is intended to be used only on dev server.
 
 package endpoints
 
@@ -101,11 +100,10 @@ func getScopedTokeninfo(c Context, scope string) (*tokeninfo, error) {
 // A context that uses tokeninfo API to validate bearer token
 type tokeninfoContext struct {
 	appengine.Context
-	r *http.Request
 }
 
 func (c *tokeninfoContext) HttpRequest() *http.Request {
-	return c.r
+	return c.Request().(*http.Request)
 }
 
 // CurrentOAuthClientID returns a clientId associated with the scope.
@@ -133,5 +131,5 @@ func (c *tokeninfoContext) CurrentOAuthUser(scope string) (*user.User, error) {
 // To be used as auth.go/ContextFactory.
 func tokeninfoContextFactory(r *http.Request) Context {
 	ac := appengine.NewContext(r)
-	return &tokeninfoContext{ac, r}
+	return &tokeninfoContext{ac}
 }
