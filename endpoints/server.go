@@ -7,7 +7,6 @@ package endpoints
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
@@ -65,7 +64,7 @@ type Server struct {
 }
 
 // NewServer returns a new RPC server.
-func NewServer(root string) *Server {
+func NewServer(root string, registerBackend bool) *Server {
 	if root == "" {
 		root = "/_ah/spi/"
 	} else if root[len(root)-1] != '/' {
@@ -73,8 +72,18 @@ func NewServer(root string) *Server {
 	}
 
 	server := &Server{root: root, services: new(serviceMap)}
+	// Don't register backend if we aren't using endpoints on GAE
 	backend := newBackendService(server)
-	server.services.register(backend, "BackendService", "", "", true, true)
+	if registerBackend {
+		server.services.register(backend, "BackendService", "", "", true, true)
+	} else {
+		discovery := newDiscoveryService(server, backend)
+		api, err := server.services.register(discovery, "discovery", "v1", "Discovery API", true, false)
+		if err != nil {
+			panic(err)
+		}
+		setupDiscoveryServiceMethods(api)
+	}
 	return server
 }
 
@@ -125,27 +134,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Mainly for debug logging
 	c := appengine.NewContext(r)
 
+	// Split off the prefix from our path so we can find the methodName
+	parts := strings.SplitN(r.URL.Path, s.root, 2)
+	path := strings.Trim(parts[1], "/")
+
 	// Always respond with JSON, even when an error occurs.
 	// Note: API server doesn't expect an encoding in Content-Type header.
 	w.Header().Set("Content-Type", "application/json")
 
-	if r.Method != "POST" {
-		err := fmt.Errorf("rpc: POST method required, got %q", r.Method)
-		writeError(w, err)
-		return
-	}
-
-	// methodName has "ServiceName.MethodName" format.
-	var methodName string
-	if idx := strings.LastIndex(r.URL.Path, "/"); idx < 0 {
-		writeError(w, fmt.Errorf("rpc: no method in path %q", r.URL.Path))
-		return
-	} else {
-		methodName = r.URL.Path[idx+1:]
-	}
-
 	// Get service method specs
-	serviceSpec, methodSpec, err := s.services.get(methodName)
+	serviceSpec, methodSpec, vars, err := s.services.getByPath(r, path)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -153,6 +151,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Initialize RPC method request
 	req := reflect.New(methodSpec.ReqType)
+
+	for k, v := range *vars {
+		titleKey := strings.Title(k)
+		field := reflect.Indirect(req).FieldByName(titleKey)
+
+		// Only accept strings as the target for path arguments
+		if field.Kind() != reflect.String {
+			continue
+		}
+		
+		field.SetString(v)
+	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -165,10 +175,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 	writeError(w, fmt.Errorf("Error while decoding JSON: %q", err))
 	// 	return
 	// }
+/*
 	if err := json.Unmarshal(body, req.Interface()); err != nil {
 		writeError(w, err)
 		return
 	}
+*/
 
 	// Initialize RPC method response and call method's function
 	resp := reflect.New(methodSpec.RespType)
@@ -222,5 +234,5 @@ func HandleHttp() {
 // TODO: var DefaultServer = NewServer("") won't work so it's in the init()
 // function for now.
 func init() {
-	DefaultServer = NewServer("")
+	DefaultServer = NewServer("", true)
 }

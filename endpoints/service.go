@@ -7,6 +7,7 @@ package endpoints
 
 import (
 	"fmt"
+	"path"
 	"net/http"
 	"reflect"
 	"strings"
@@ -92,6 +93,7 @@ type MethodInfo struct {
 	// name can also contain resource, e.g. "greets.list"
 	Name       string
 	Path       string
+	PathRegex  *routeRegexp
 	HttpMethod string
 	Scopes     []string
 	Audiences  []string
@@ -107,6 +109,7 @@ type MethodInfo struct {
 type serviceMap struct {
 	mutex    sync.Mutex
 	services map[string]*RpcService
+	servicePaths map[string]*RpcService
 }
 
 // register adds a new service using reflection to extract its methods.
@@ -153,6 +156,7 @@ func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault
 			s.methods[method.Name] = srvMethod
 		}
 	}
+
 	if len(s.methods) == 0 {
 		return nil, fmt.Errorf(
 			"endpoints: %q has no exported methods of suitable type", s.name)
@@ -167,6 +171,15 @@ func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault
 		return nil, fmt.Errorf("endpoints: service already defined: %q", s.name)
 	}
 	m.services[s.name] = s
+
+	pathName := path.Join(name, ver)
+	if m.servicePaths == nil {
+		m.servicePaths = make(map[string]*RpcService)
+	} else if _, ok := m.servicePaths[pathName]; ok {
+		return nil, fmt.Errorf("endpoints: service already defined: %q", s.name)
+	}
+	m.servicePaths[pathName] = s
+
 	return s, nil
 }
 
@@ -265,9 +278,7 @@ func (m *serviceMap) get(method string) (*RpcService, *ServiceMethod, error) {
 	}
 	parts[1] = strings.Title(parts[1])
 
-	m.mutex.Lock()
-	service := m.services[parts[0]]
-	m.mutex.Unlock()
+	service := m.serviceByName(parts[2])
 	if service == nil {
 		err := fmt.Errorf("endpoints: can't find service %q", parts[0])
 		return nil, nil, err
@@ -281,12 +292,85 @@ func (m *serviceMap) get(method string) (*RpcService, *ServiceMethod, error) {
 	return service, ServiceMethod, nil
 }
 
+func (m *serviceMap) getByPath(r *http.Request, servicePath string) (*RpcService, *ServiceMethod,*pathVars, error) {
+	var serviceName, version, methodPath string
+	var method *ServiceMethod
+	var vars *pathVars
+	parts := strings.SplitN(servicePath, "/", 3)
+
+	if len(parts) == 3 {
+		serviceName = parts[0]
+		version = parts[1]
+		methodPath = parts[2]
+	}
+
+	service := m.serviceByPath(path.Join(serviceName, version))
+	if service == nil {
+		err := fmt.Errorf(
+			"endpoints: can't find service %q", serviceName)
+		return nil, nil, nil, err
+	}
+
+	// TODO: Figure out a better way to do this and take into account variables in path
+	for _, v := range service.methods {
+		if matched, mvars := m.matchPath(r, v, methodPath); matched {
+			method = v
+			vars = mvars
+			break
+		}
+	}
+
+	if method == nil {
+		err := fmt.Errorf(
+			"endpoints: can't find method %q of service %q", methodPath, serviceName)
+		return nil, nil, nil, err
+	}
+
+	return service, method, vars, nil
+}
+
+type pathVars map[string]string
+
+// Match matches the route against the request.
+func (m *serviceMap) matchPath(r *http.Request, method *ServiceMethod, path string) (bool, *pathVars) {
+	info := method.info
+	regex := info.PathRegex
+
+	// TODO: the current go-endpoints API could be abused to change
+	// info.Path after we make this regex object
+	if regex == nil {
+		reg, err := newRouteRegexp(info.Path)
+		if err != nil {
+			panic(err)
+		}
+		regex = reg
+	}
+
+	// Match everything.
+	if matched := regex.Match(path); !matched {
+		return false, nil
+	}
+
+	vars := make(pathVars)
+	regex.extractVars(path, &vars)
+	return true, &vars
+}
+
+
 // serviceByName returns a registered service or nil if there's no service
 // registered by that name.
 func (m *serviceMap) serviceByName(serviceName string) *RpcService {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	return m.services[serviceName]
+}
+
+// serviceByPath returns a registered service or nil if there's no service
+// registered by that name.
+func (m *serviceMap) serviceByPath(path string) *RpcService {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.servicePaths[path]
 }
 
 // isExported returns true of a string is an exported (upper case) name.
@@ -304,3 +388,4 @@ func isExportedOrBuiltin(t reflect.Type) bool {
 	// so we need to check the type name as well.
 	return isExported(t.Name()) || t.PkgPath() == ""
 }
+

@@ -602,3 +602,9 @@ func TestParseTag(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Parse tests
+
+func TestDiscovery(t *testing.T) {
+}
