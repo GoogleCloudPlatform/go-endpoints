@@ -525,7 +525,7 @@ func TestFieldNamesNested(t *testing.T) {
 
 func TestParsePath(t *testing.T) {
 	params, _ := parsePath("one/{a}/two/{b}/three/{c.d}")
-	assertEquals(t, params, []string{"a", "b", "c.d"})
+	assertEquals(t, 0, params, []string{"a", "b", "c.d"})
 }
 
 func TestParseValue(t *testing.T) {
