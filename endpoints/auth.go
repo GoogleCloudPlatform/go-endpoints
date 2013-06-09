@@ -68,6 +68,9 @@ var (
 type Context interface {
 	appengine.Context
 
+	// HttpRequest returns the request associated with this context.	
+	HttpRequest() *http.Request
+
 	// CurrentOAuthClientID returns a clientId associated with the scope.
 	CurrentOAuthClientID(scope string) (string, error)
 
@@ -498,10 +501,6 @@ func CurrentBearerTokenUser(c Context, scopes []string, clientIDs []string) (*us
 		return nil, err
 	}
 
-	// TODO(dhermes): If appengine.IsDevAppServer(), use the tokeninfo API, which is
-	//                a POST to
-	//                https://www.googleapis.com/oauth2/v2/tokeninfo?access_token=$TOKEN
-	//                where $TOKEN is parsed from the Authorization header.
 	return c.CurrentOAuthUser(scope)
 }
 
@@ -518,12 +517,7 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 		return nil, errors.New("No client ID or scope info provided.")
 	}
 
-	req, ok := c.Request().(*http.Request)
-	if !ok {
-		return nil, errors.New("No request exists in the context.")
-	}
-
-	token := getToken(req)
+	token := getToken(c.HttpRequest())
 	if token == "" {
 		return nil, errors.New("No token in the current context.")
 	}
@@ -544,4 +538,12 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 
 	c.Infof("Checking for Bearer token.")
 	return CurrentBearerTokenUser(c, scopes, clientIDs)
+}
+
+func init() {
+	if appengine.IsDevAppServer() {
+		ContextFactory = tokeninfoContextFactory
+	} else {
+		ContextFactory = cachingContextFactory
+	}
 }
