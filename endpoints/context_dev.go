@@ -11,10 +11,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"appengine"
-	"appengine/memcache"
 	"appengine/urlfetch"
 	"appengine/user"
 )
@@ -33,6 +31,9 @@ type tokeninfo struct {
 	Email         string `json:"email"`
 	VerifiedEmail bool   `json:"verified_email"`
 	AccessType    string `json:"access_type"`
+	// ErrorDescription is populated when an error occurs. Usually, the response
+	// either contains only ErrorDescription or the fields above
+	ErrorDescription string `json:"error_description"`
 }
 
 // fetchTokeninfo retrieves token info from tokeninfoEndpointUrl and
@@ -41,17 +42,6 @@ type tokeninfo struct {
 // 
 // It uses a separate namespace.
 func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
-	ns, err := appengine.Namespace(c, tokeninfoContextNS)
-	if err != nil {
-		return nil, err
-	}
-
-	ti := &tokeninfo{}
-	_, err = memcache.JSON.Get(ns, token, ti)
-	if err == nil {
-		return ti, nil
-	}
-
 	client := urlfetch.Client(c)
 	url := tokeninfoEndpointUrl + "?access_token=" + token
 	c.Debugf("Fetching token info from %q", url)
@@ -60,20 +50,28 @@ func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Error from tokeninfo: %d", resp.StatusCode)
+
+	ti := &tokeninfo{}
+	if err = json.NewDecoder(resp.Body).Decode(ti); err != nil {
+		return nil, err
 	}
-
-	err = json.NewDecoder(resp.Body).Decode(ti)
-
-	if err == nil && ti.ExpiresIn > 0 {
-		item := &memcache.Item{
-			Key:        token,
-			Object:     ti,
-			Expiration: time.Duration(ti.ExpiresIn) * time.Second,
+	if resp.StatusCode != http.StatusOK {
+		errMsg := fmt.Sprintf("Error fetching tokeninfo (status %d)", resp.StatusCode)
+		if ti.ErrorDescription != "" {
+			errMsg += ": " + ti.ErrorDescription
 		}
-		memcache.JSON.Set(ns, item)
+		return nil, errors.New(errMsg)
 	}
+
+	switch {
+	case ti.ExpiresIn <= 0:
+		return nil, errors.New("Token is expired")
+	case !ti.VerifiedEmail:
+		return nil, fmt.Errorf("Unverified email %q", ti.Email)
+	case ti.Email == "":
+		return nil, fmt.Errorf("Invalid email address")
+	}
+
 	return ti, err
 }
 
@@ -121,10 +119,7 @@ func (c *tokeninfoContext) CurrentOAuthUser(scope string) (*user.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &user.User{
-		Email: ti.Email,
-		ID:    ti.UserId,
-	}, nil
+	return &user.User{Email: ti.Email}, nil
 }
 
 // tokeninfoContextFactory creates a new tokeninfoContext from r.
