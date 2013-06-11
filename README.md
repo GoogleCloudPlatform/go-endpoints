@@ -160,7 +160,7 @@ That's it. You should be able to run tests with "aet test ./endpoints" now.
 
 [1]: https://developers.google.com/appengine/docs/python/endpoints/
 [2]: https://developers.google.com/appengine/docs/java/endpoints/
-[3]: https://github.com/crhym3/go-endpoints/tree/master/tictactoeapp
+[3]: https://github.com/crhym3/go-tictactoe
 [4]: https://github.com/crhym3/aegot
 [5]: http://localhost:8080/_ah/api/discovery/v1/apis/greeting/v1/rest
 [6]: http://localhost:8080/_ah/api/explorer
