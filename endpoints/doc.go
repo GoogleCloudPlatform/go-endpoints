@@ -1,5 +1,5 @@
 /*
-This package will let you write Cloud Endpoints backends in Go.
+This package will let you write Cloud Endpoints backend in Go.
 
 Usage
 
@@ -8,10 +8,10 @@ Declare structs which describe your data. For instance:
 	// Greeting is a datastore entity that represents a single greeting.
 	// It also serves as (a part of) a response of GreetingService.
 	type Greeting struct {
-	  Id      string    `json:"id,omitempty" datastore:"-"`
-	  Author  string    `json:"author"`
-	  Content string    `json:"content" datastore:",noindex"`
-	  Date    time.Time `json:"date"`
+	  Key     *datastore.Key `json:"id" datastore:"-"`
+	  Author  string         `json:"author"`
+	  Content string         `json:"content" datastore:",noindex" endpoints:"req"`
+	  Date    time.Time      `json:"date"`
 	}
 
 	// GreetingsList is a response type of GreetingService.List method
@@ -21,7 +21,7 @@ Declare structs which describe your data. For instance:
 
 	// Request type for GreetingService.List
 	type GreetingsListReq struct {
-	  Limit int
+	  Limit int `json:"limit" endpoints:"d=10"`
 	}
 
 
@@ -37,16 +37,20 @@ Then, a service:
 	func (gs *GreetingService) List(
 	  r *http.Request, req *GreetingsListReq, resp *GreetingsList) error {
 
-	  ctx := appengine.NewContext(r)
+	  if req.Limit <= 0 {
+	    req.Limit = 10
+	  }
+
+	  c := endpoints.NewContext(r)
 	  q := datastore.NewQuery("Greeting").Order("-Date").Limit(req.Limit)
 	  greets := make([]*Greeting, 0, req.Limit)
-	  keys, err := q.GetAll(ctx, &greets)
+	  keys, err := q.GetAll(c, &greets)
 	  if err != nil {
 	    return err
 	  }
 
 	  for i, k := range keys {
-	    greets[i].Id = k.Encode()
+	    greets[i].Key = k
 	  }
 	  resp.Items = greets
 	  return nil
@@ -201,9 +205,9 @@ out of the box, if I wanted to:
 
 	type User struct {
 	    Key *datastore.Key `json:"id" datastore:"-"`
-	    Name string `json:"name" datastore:"name"`
-	    Role string `json:"role" datastore:"role"`
-	    Email string `json:"email" datastore:"email"`
+	    Name string        `json:"name" datastore:"name"`
+	    Role string        `json:"role" datastore:"role"`
+	    Email string       `json:"email" datastore:"email"`
 	}
 
 	type GetUserReq struct {
@@ -299,11 +303,60 @@ In this case, it is sufficient to append ",string" to the json tag:
 	}
 
 
+Generate client libraries
+
+Once an app is deployed on appspot.com, we can use the discovery doc to generate
+libraries for different clients.
+
+Android
+
+	$ URL='https://my-app-id.appspot.com/_ah/api/discovery/v1/apis/greeting/v1/rest'
+	$ curl -s $URL > greetings.rest.discovery
+
+	# Optionally check the discovery doc
+	$ less greetings.rest.discovery
+
+	$ GO_SDK/endpointscfg.py gen_client_lib java greetings.rest.discovery
+
+You should be able to find ./greetings.rest.zip file with Java client source
+code and its dependencies.
+
+Once you have that, follow the official guide
+https://developers.google.com/appengine/docs/python/endpoints/consume_android.
+
+iOS
+
+	# Note the rpc suffix in the URL:
+	$ URL='https://my-app-id.appspot.com/_ah/api/discovery/v1/apis/greeting/v1/rpc'
+	$ curl -s $URL > greetings.rpc.discovery
+
+	# optionally check the discovery doc
+	$ less greetings.rpc.discovery
+
+Then, feed greetings.rpc.discovery file to the library generator on OS X
+as described in the official guide:
+https://developers.google.com/appengine/docs/python/endpoints/consume_ios
+
+JavaScript
+
+There's really nothing to generate for JavaScript, you just use it!
+
+Here's the official guide:
+https://developers.google.com/appengine/docs/python/endpoints/consume_js
+
+
+Other docs
+
+Wiki pages on the github repo:
+https://github.com/crhym3/go-endpoints/wiki
+
 
 Samples
 
 Check out TicTacToe sample:
 https://github.com/crhym3/go-tictactoe
+
+Or play it on the live demo app at https://go-endpoints.appspot.com/tictactoe
 
 
 Running tests
