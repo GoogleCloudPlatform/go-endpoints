@@ -150,15 +150,15 @@ Now that we have the discovery doc, let's generate some client libraries.
 
 ```
 $ URL='https://my-app-id.appspot.com/_ah/api/discovery/v1/apis/greeting/v1/rest'
-$ curl -s $URL > greetings.discovery
+$ curl -s $URL > greetings.rest.discovery
 
 # Optionally check the discovery doc
-$ less greetings.discovery
+$ less greetings.rest.discovery
 
-$ GO_SDK/endpointscfg.py gen_client_lib java greetings.discovery
+$ GO_SDK/endpointscfg.py gen_client_lib java greetings.rest.discovery
 ```
 
-You should be able to find `./greetings.zip` file with Java client source
+You should be able to find `./greetings.rest.zip` file with Java client source
 code and its dependencies.
 
 Once you have that, follow the official guide:
@@ -169,10 +169,10 @@ Once you have that, follow the official guide:
 ```
 # Note the rpc suffix in the URL:
 $ URL='https://my-app-id.appspot.com/_ah/api/discovery/v1/apis/greeting/v1/rpc'
-$ curl -s $URL > greetings.discovery
+$ curl -s $URL > greetings.rpc.discovery
 
 # Optionally check the discovery doc
-$ less greetings.discovery
+$ less greetings.rpc.discovery
 ```
 
 Then, feed `greetings.discovery` file to the library generator on OS X as
