@@ -2,15 +2,15 @@
   <img align="right" src="https://api.travis-ci.org/crhym3/go-endpoints.png"
        alt="Build Status">
 </a>
-# The missing Cloud Endpoints for Go
+# Cloud Endpoints for Go
 
 This package will let you write Cloud Endpoints backends in Go.
 
 If you're not familiar with Cloud Endpoints, see Google App Engine official
 documentation for [Python][1] or [Java][2].
 
-Install
-===
+
+## Install
 
 Start with `go get github.com/crhym3/go-endpoints/endpoints`. If this is not
 the first time you're "getting" the package, add `-u` param to get an updated
@@ -31,8 +31,8 @@ normally available only when running an app with dev appserver, and since that's
 precisely what we want to do, "unrecognized import path" errors can be safely
 ignored.
 
-Usage
-===
+
+## Usage
 
 Declare structs which describe your data. For instance:
 
@@ -40,10 +40,10 @@ Declare structs which describe your data. For instance:
 // Greeting is a datastore entity that represents a single greeting.
 // It also serves as (a part of) a response of GreetingService.
 type Greeting struct {
-  Id      string    `json:"id,omitempty" datastore:"-"`
-  Author  string    `json:"author"`
-  Content string    `json:"content" datastore:",noindex"`
-  Date    time.Time `json:"date"`
+  Key     *datastore.Key `json:"id" datastore:"-"`
+  Author  string         `json:"author"`
+  Content string         `json:"content" datastore:",noindex" endpoints:"req"`
+  Date    time.Time      `json:"date"`
 }
 
 // GreetingsList is a response type of GreetingService.List method
@@ -53,7 +53,7 @@ type GreetingsList struct {
 
 // Request type for GreetingService.List
 type GreetingsListReq struct {
-  Limit int
+  Limit int `json:"limit" endpoints:"d=10"`
 }
 ```
 
@@ -70,16 +70,20 @@ type GreetingService struct {
 func (gs *GreetingService) List(
   r *http.Request, req *GreetingsListReq, resp *GreetingsList) error {
 
-  ctx := appengine.NewContext(r)
+  if req.Limit <= 0 {
+    req.Limit = 10
+  }
+
+  c := endpoints.NewContext(r)
   q := datastore.NewQuery("Greeting").Order("-Date").Limit(req.Limit)
   greets := make([]*Greeting, 0, req.Limit)
-  keys, err := q.GetAll(ctx, &greets)
+  keys, err := q.GetAll(c, &greets)
   if err != nil {
     return err
   }
 
   for i, k := range keys {
-    greets[i].Id = k.Encode()
+    greets[i].Key = k
   }
   resp.Items = greets
   return nil
@@ -137,14 +141,63 @@ Naturally, API Explorer works too:
 
 Time to deploy the app on [appengine.appspot.com][7]!
 
-Samples
-===
+
+## Generate client libs
+
+Now that we have the discovery doc, let's generate some client libraries.
+
+### Android
+
+```
+$ URL='https://my-app-id.appspot.com/_ah/api/discovery/v1/apis/greeting/v1/rest'
+$ curl -s $URL > greetings.discovery
+
+# Optionally check the discovery doc
+$ less greetings.discovery
+
+$ GO_SDK/endpointscfg.py gen_client_lib java greetings.discovery
+```
+
+You should be able to find `./greetings.zip` file with Java client source
+code and its dependencies.
+
+Once you have that, follow the official guide:
+[Using Endpoints in an Android Client][8].
+
+### iOS
+
+```
+# Note the rpc suffix in the URL:
+$ URL='https://my-app-id.appspot.com/_ah/api/discovery/v1/apis/greeting/v1/rpc'
+$ curl -s $URL > greetings.discovery
+
+# Optionally check the discovery doc
+$ less greetings.discovery
+```
+
+Then, feed `greetings.discovery` file to the library generator on OS X as
+described in the official guide [Using Endpoints in an iOS Client][9].
+
+### JavaScript
+
+There's really nothing to generate for JavaScript, you just use it!
+
+Here's the official guide: [Using Endpoints in a JavaScript client][10].
+
+
+## Docs
+
+  - [Go endpoints package docs][11]
+  - [Wiki of this repo][12]
+
+
+## Samples
 
 Check out the famous [TicTacToe app][3]. It has its own readme file.
 
+Or you can just play it on the [live demo app][13].
 
-Running tests
-===
+## Running tests
 
 We currently use [aet tool][4] to simplify running tests on files that have
 "appengine" or "appengine_internal" imports.
@@ -165,3 +218,9 @@ That's it. You should be able to run tests with "aet test ./endpoints" now.
 [5]: http://localhost:8080/_ah/api/discovery/v1/apis/greeting/v1/rest
 [6]: http://localhost:8080/_ah/api/explorer
 [7]: http://appengine.appspot.com
+[8]: https://developers.google.com/appengine/docs/python/endpoints/consume_android
+[9]: https://developers.google.com/appengine/docs/python/endpoints/consume_ios
+[10]: https://developers.google.com/appengine/docs/python/endpoints/consume_js
+[11]: http://godoc.org/github.com/crhym3/go-endpoints/endpoints
+[12]: https://github.com/crhym3/go-endpoints/wiki
+[13]: https://go-endpoints.appspot.com/tictactoe
