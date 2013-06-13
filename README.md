@@ -175,7 +175,7 @@ $ curl -s $URL > greetings.rpc.discovery
 $ less greetings.rpc.discovery
 ```
 
-Then, feed `greetings.discovery` file to the library generator on OS X as
+Then, feed `greetings.rpc.discovery` file to the library generator on OS X as
 described in the official guide [Using Endpoints in an iOS Client][9].
 
 ### JavaScript

@@ -333,7 +333,7 @@ iOS
 	# optionally check the discovery doc
 	$ less greetings.rpc.discovery
 
-Then, feed greetings.discovery file to the library generator on OS X
+Then, feed greetings.rpc.discovery file to the library generator on OS X
 as described in the official guide:
 https://developers.google.com/appengine/docs/python/endpoints/consume_ios
 
