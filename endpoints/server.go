@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"strings"
 	// Mainly for debug logging
-	"appengine"
 	"io/ioutil"
 )
 
@@ -120,10 +119,12 @@ func (s *Server) HandleHttp(mux *http.ServeMux) {
 	mux.Handle(s.root, s)
 }
 
-// ServeHTTP is Server's implementation of http.ServiceByName interface.
+// ServeHTTP is Server's implementation of http.Handler interface.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Mainly for debug logging
-	c := appengine.NewContext(r)
+	c := NewContext(r)
+	defer func() {
+		destroyContext(c)
+	}()
 
 	// Always respond with JSON, even when an error occurs.
 	// Note: API server doesn't expect an encoding in Content-Type header.
@@ -186,7 +187,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Encode non-error response
-	json.NewEncoder(w).Encode(resp.Interface())
+	if err := json.NewEncoder(w).Encode(resp.Interface()); err != nil {
+		writeError(w, err)
+	}
 }
 
 // writeError writes SPI-compatible error response.
