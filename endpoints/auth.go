@@ -95,6 +95,14 @@ func NewContext(req *http.Request) Context {
 	return c
 }
 
+// destroyContext removes all references to a Context c so that GC can
+// do its thing and collect the garbage.
+func destroyContext(c Context) {
+	ctxsMu.Lock()
+	defer ctxsMu.Unlock()
+	delete(ctxs, c.HttpRequest())
+}
+
 // getToken looks for Authorization header and returns a token.
 // 
 // Returns empty string if req does not contain authorization header
