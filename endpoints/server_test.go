@@ -86,9 +86,9 @@ func TestServerServeHTTP(t *testing.T) {
 		// do the fake request
 		server.ServeHTTP(w, r)
 
-		// verify endpoints.context has been destroy
+		// verify endpoints.context has been destroyed
 		if c, exists := ctxs[r]; exists {
-			fail(t, "%d: expected context to be deleted: %#v", i, c)
+			t.Errorf("%d: expected context to be deleted: %#v", i, c)
 		}
 
 		// make sure the response is correct
