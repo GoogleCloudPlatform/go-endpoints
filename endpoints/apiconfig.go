@@ -116,11 +116,11 @@ type ApiSchemaProperty struct {
 
 // ApiDescriptor populates provided ApiDescriptor with all info needed to
 // generate a discovery doc from its receiver.
-// 
+//
 // Args:
 //   - dst, a non-nil pointer to ApiDescriptor struct
 //   - host, a hostname used for discovery API config Root and BNS.
-//   
+//
 // Returns error if malformed params were encountered
 // (e.g. ServerMethod.Path, etc.)
 func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
@@ -185,8 +185,8 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 }
 
 // toApiMethod creates a new ApiMethod using its receiver info and provided
-// rosy service name. 
-// 
+// rosy service name.
+//
 // Args:
 //   - rosySrv, original name of a service, e.g. "MyService"
 func (md *ApiMethodDescriptor) toApiMethod(rosySrv string) (*ApiMethod, error) {
@@ -219,7 +219,7 @@ func (md *ApiMethodDescriptor) toApiMethod(rosySrv string) (*ApiMethod, error) {
 
 // addSchemaFromType creates a new ApiSchemaDescriptor from given Type t
 // and adds it to the map with the key of type's name name.
-// 
+//
 // Returns an error if ApiSchemaDescriptor cannot be created from this Type.
 func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) error {
 	if t.Name() == "" {
@@ -254,17 +254,22 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) erro
 
 			case fkind == reflect.Ptr, fkind == reflect.Struct:
 				typ := indirectType(field.Type)
-				switch {
-				case typ == typeOfTime:
-					prop.Type, prop.Format = "string", "date-time"
+				if stype, format := typeToPropFormat(typ); stype != "" {
+					// pointer to a basic type.
+					prop.Type, prop.Format = stype, format
+				} else {
+					switch {
+					case typ == typeOfTime:
+						prop.Type, prop.Format = "string", "date-time"
 
-				case typ.Kind() == reflect.Struct:
-					prop.Ref = typ.Name()
-					ensureSchemas[prop.Ref] = typ
-				default:
-					return fmt.Errorf(
-						"Unsupported type %#v of property %s.%s",
-						field.Type, sd.Id, name)
+					case typ.Kind() == reflect.Struct:
+						prop.Ref = typ.Name()
+						ensureSchemas[prop.Ref] = typ
+					default:
+						return fmt.Errorf(
+							"Unsupported type %#v of property %s.%s",
+							field.Type, sd.Id, name)
+					}
 				}
 
 			case fkind == reflect.Slice:
@@ -316,7 +321,7 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) erro
 
 // setApiReqRespBody populates ApiReqRespDescriptor with correct values based
 // on provided arguments.
-// 
+//
 // Args:
 //   - d, a non-nil pointer of ApiReqRespDescriptor to populate
 //   - template, either "backendRequest" or "backendResponse"
@@ -411,7 +416,7 @@ func typeToPropFormat(t reflect.Type) (string, string) {
 
 // typeToParamsSpec creates a new ApiRequestParamSpec map from a Type for all
 // fields in t.
-// 
+//
 // Normally, t is a Struct type and it's what an original service method
 // expects as input (request arg).
 func typeToParamsSpec(t reflect.Type) (
@@ -437,7 +442,7 @@ func typeToParamsSpec(t reflect.Type) (
 
 // typeToParamsSpecFromPath is almost the same as typeToParamsSpec but considers
 // only those params present in template path.
-// 
+//
 // path template is is something like "some/{a}/path/{b}".
 func typeToParamsSpecFromPath(t reflect.Type, path string) (
 	map[string]*ApiRequestParamSpec, error) {
@@ -475,12 +480,15 @@ func typeToParamsSpecFromPath(t reflect.Type, path string) (
 
 // fieldToParamSpec creates a ApiRequestParamSpec from the given StructField.
 // It returns error if the field's kind/type is not supported.
-// 
+//
 // See parseTag() method for supported tag options.
 func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err error) {
 	p = &ApiRequestParamSpec{}
 	kind := field.Type.Kind()
+	if kind == reflect.Ptr {
+		kind = indirectType(field.Type).Kind()
 
+	}
 	switch {
 	case reflect.Int <= kind && kind <= reflect.Int32:
 		p.Type = "int32"
@@ -527,10 +535,10 @@ func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err e
 // fieldNames loops over each field of t and creates a map of
 // fieldName (string) => *StructField where fieldName is extracted from json
 // field tag. Defaults to StructField.Name.
-// 
+//
 // It expands (flattens) nexted structs if flatten == true, and always skips
 // unexported fields or thosed tagged with json:"-"
-// 
+//
 // This method accepts only reflect.Struct type. Passing other types will
 // most likely make it panic.
 func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
@@ -578,18 +586,18 @@ type endpointsTag struct {
 const endpointsTagName = "endpoints"
 
 // parseTag parses "endpoints" field tag into endpointsTag struct.
-// 
+//
 //   type MyMessage struct {
 //       SomeField int `endpoints:"req,min=0,max=100,desc="Int field"`
 //       WithDefault string `endpoints:"d=Hello gopher"`
 //   }
-//   
+//
 //   - req, required (boolean)
 //   - d=val, default value
 //   - min=val, min value
 //   - max=val, max value
 //   - desc=val, description
-// 
+//
 // It is an error to specify both default and required.
 func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 	eTag := &endpointsTag{}
@@ -628,7 +636,7 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 
 // parsePath parses a path template and returns found placeholders.
 // It returns error if the template is malformed.
-// 
+//
 // For instance, parsePath("one/{a}/two/{b}") will return []string{"a","b"}.
 func parsePath(path string) ([]string, error) {
 	params := make([]string, 0)
