@@ -46,14 +46,22 @@ var _ = json.Marshaler((*canMarshal)(nil))
 var _ = json.Unmarshaler((*canMarshal)(nil))
 
 type DummyMsg struct {
-	String    string  `json:"str" endpoints:"req,desc=A string field"`
-	Int       int     `json:"i" endpoints:"min=-200,max=200,d=-100"`
-	Uint      uint    `endpoints:"min=0,max=100"`
-	Int64     int64   `endpoints:"d=123"`
-	Uint64    uint64  `endpoints:"d=123"`
-	Float32   float32 `endpoints:"d=123.456"`
-	Float64   float64 `endpoints:"d=123.456"`
-	BoolField bool    `json:"bool_field" endpoints:"d=true"`
+	String    string   `json:"str" endpoints:"req,desc=A string field"`
+	Int       int      `json:"i" endpoints:"min=-200,max=200,d=-100"`
+	Uint      uint     `endpoints:"min=0,max=100"`
+	Int64     int64    `endpoints:"d=123"`
+	Uint64    uint64   `endpoints:"d=123"`
+	Float32   float32  `endpoints:"d=123.456"`
+	Float64   float64  `endpoints:"d=123.456"`
+	BoolField bool     `json:"bool_field" endpoints:"d=true"`
+	Pstring   *string  `json:"pstring"`
+	Pint      *int     `json:"pint"`
+	Puint     *uint    `json:"puint"`
+	Pint64    *int64   `json:"pint64"`
+	Puint64   *uint64  `json:"puint64"`
+	Pfloat32  *float32 `json:"pfloat32"`
+	Pfloat64  *float64 `json:"pfloat64"`
+	PBool     *bool    `json:"pbool"`
 	Bytes     []byte
 	Internal  string `json:"-"`
 	Marshal   *canMarshal
@@ -248,6 +256,14 @@ func TestApiGetSubMethod(t *testing.T) {
 		{"msg.Float32", "float", false, float32(123.456), nil, nil, false, 0},
 		{"msg.Float64", "double", false, 123.456, nil, nil, false, 0},
 		{"msg.bool_field", "boolean", false, true, nil, nil, false, 0},
+		{"msg.pstring", "string", false, nil, nil, nil, false, 0},
+		{"msg.pint", "int32", false, nil, nil, nil, false, 0},
+		{"msg.puint", "uint32", false, nil, nil, nil, false, 0},
+		{"msg.pint64", "int64", false, nil, nil, nil, false, 0},
+		{"msg.puint64", "uint64", false, nil, nil, nil, false, 0},
+		{"msg.pfloat32", "float", false, nil, nil, nil, false, 0},
+		{"msg.pfloat64", "double", false, nil, nil, nil, false, 0},
+		{"msg.pbool", "boolean", false, nil, nil, nil, false, 0},
 		{"msg.Bytes", "bytes", false, nil, nil, nil, false, 0},
 		{"msg.Marshal", "string", false, nil, nil, nil, false, 0},
 	}
@@ -383,6 +399,14 @@ func TestDummyMsgSchema(t *testing.T) {
 		{"Float32", "number", "float", false, float32(123.456), "", ""},
 		{"Float64", "number", "double", false, float64(123.456), "", ""},
 		{"bool_field", "boolean", "", false, true, "", ""},
+		{"pstring", "string", "", false, nil, "", ""},
+		{"pint", "integer", "int32", false, nil, "", ""},
+		{"puint", "integer", "uint32", false, nil, "", ""},
+		{"pint64", "string", "int64", false, nil, "", ""},
+		{"puint64", "string", "uint64", false, nil, "", ""},
+		{"pfloat32", "number", "float", false, nil, "", ""},
+		{"pfloat64", "number", "double", false, nil, "", ""},
+		{"pbool", "boolean", "", false, nil, "", ""},
 		{"Bytes", "string", "byte", false, nil, "", ""},
 		{"Marshal", "string", "", false, nil, "", ""},
 	}
