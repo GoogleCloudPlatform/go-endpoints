@@ -184,6 +184,33 @@ There's really nothing to generate for JavaScript, you just use it!
 
 Here's the official guide: [Using Endpoints in a JavaScript client][10].
 
+### Dart
+
+
+```
+# Clone or fork discovery_api_dart_client_generator
+git clone https://github.com/dart-gde/discovery_api_dart_client_generator
+cd discovery_api_dart_client_generator
+pub install
+
+# Generate your client library:
+URL='https://my-app-id.appspot.com/_ah/api/discovery/v1/apis/greeting/v1/rest'
+curl -s -o greetings.rpc.discovery $URL
+bin/generate.dart --no-prefix -i greetings.rpc.discovery -o ../
+```
+
+Now you just have to add your endpoints client library to your dart application (assuming it is in the parent directory.)
+
+```
+cd ../my-app_dart/
+cat >>pubspec.yaml <<EOF
+  my-app-id_v1_api:
+  path: ../dart_my-app-id_v1_api_client
+EOF
+```
+
+Take a look at the api client [examples](https://github.com/dart-gde/dart_api_client_examples) to
+get a feel on how to use your library.
 
 ## Docs
 
