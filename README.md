@@ -141,6 +141,10 @@ Naturally, API Explorer works too:
 
 Time to deploy the app on [appengine.appspot.com][7]!
 
+**N.B.** At present, you can't map your endpoint URL to a custom domain. Bossylobster 
+[wrote](http://stackoverflow.com/a/16124815/1745000): "It's a non-trivial networking problem
+and something Google certainly plan on supporting in the future. Keep in mind, Cloud Endpoints 
+is a combination or App Engine and Google's API Infrastructure."
 
 ## Generate client libs
 
