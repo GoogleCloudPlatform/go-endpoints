@@ -21,6 +21,7 @@ type errorResponse struct {
 	State string `json:"state"`
 	Name  string `json:"error_name"`
 	Msg   string `json:"error_message,omitempty"`
+	Code  int    `json:"-"`
 }
 
 // errorNames is a slice of special error names (or better, their prefixes).
@@ -34,25 +35,43 @@ var errorNames = []string{
 	"Not Found",
 }
 
+// errorCodes is a slice of special error codes (or better, their prefixes).
+// See newErrorResponse method for details.
+var errorCodes = []int{
+	http.StatusInternalServerError,
+	http.StatusBadRequest,
+	http.StatusUnauthorized,
+	http.StatusForbidden,
+	http.StatusNotFound,
+}
+
 // Creates and initializes a new errorResponse.
 // If msg contains any of errorNames then errorResponse.Name will be set
 // to that name and the rest of the msg becomes errorResponse.Msg.
 // Otherwise, a default error name is used and msg argument
 // is errorResponse.Msg.
-func newErrorResponse(msg string) *errorResponse {
-	if msg == "" {
-		return &errorResponse{State: "APPLICATION_ERROR", Name: errorNames[0]}
+func newErrorResponse(e error) *errorResponse {
+
+	switch t := e.(type) {
+	case *ApiError:
+		return &errorResponse{State: "APPLICATION_ERROR", Name: t.Name, Msg: t.Msg, Code: t.Code}
 	}
+
+	msg := e.Error()
+
 	err := &errorResponse{State: "APPLICATION_ERROR"}
-	for _, name := range errorNames {
+	for i, name := range errorNames {
 		if strings.HasPrefix(msg, name) {
 			err.Name = name
 			err.Msg = msg[len(name):]
+			err.Code = errorCodes[i]
 		}
 	}
 	if err.Name == "" {
 		err.Name = errorNames[0]
 		err.Msg = msg
+		//for compatibility
+		err.Code = 400
 	}
 	return err
 }
@@ -194,8 +213,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // writeError writes SPI-compatible error response.
 func writeError(w http.ResponseWriter, err error) {
-	errResp := newErrorResponse(err.Error())
-	w.WriteHeader(400)
+	errResp := newErrorResponse(err)
+	w.WriteHeader(errResp.Code)
 	json.NewEncoder(w).Encode(errResp)
 }
 
