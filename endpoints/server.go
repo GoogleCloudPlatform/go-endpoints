@@ -70,7 +70,7 @@ func newErrorResponse(e error) *errorResponse {
 	if err.Name == "" {
 		err.Name = errorNames[0]
 		err.Msg = msg
-		//for compatibility
+		//for compatibility, Before behavior, always return 400 HTTP Status Code.
 		err.Code = 400
 	}
 	return err
