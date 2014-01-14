@@ -1,6 +1,6 @@
 // This implementation of Context interface uses tokeninfo API to validate
 // bearer token.
-// 
+//
 // It is intended to be used only on dev server.
 
 package endpoints

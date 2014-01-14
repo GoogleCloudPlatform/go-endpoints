@@ -43,7 +43,7 @@ type LogMessage struct {
 }
 
 // API config enumeration service used by Google API Server.
-// 
+//
 // This is a simple API providing a list of APIs served by this App Engine
 // instance. It is called by the Google API Server during app deployment
 // to get an updated interface for each of the supported APIs.
@@ -53,7 +53,7 @@ type BackendService struct {
 
 // GetApiConfigs creates ApiDescriptor for every registered RpcService and
 // responds with a config suitable for generating Discovery doc.
-// 
+//
 // Responds with a list of active APIs and their configuration files.
 func (s *BackendService) GetApiConfigs(
 	r *http.Request, req *GetApiConfigsRequest, resp *ApiConfigsList) error {

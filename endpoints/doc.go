@@ -104,7 +104,7 @@ http://localhost:8080/_ah/api/explorer
 Custom types
 
 You can define your own types and use them directly as a field type in a
-service method request/response as long as they implement json.Marshaler and 
+service method request/response as long as they implement json.Marshaler and
 json.Unmarshaler interfaces.
 
 Let's say we have this method:
