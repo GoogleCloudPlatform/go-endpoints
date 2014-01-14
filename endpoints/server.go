@@ -30,7 +30,7 @@ type errorResponse struct {
 }
 
 // This is the default error returned
-const defaultError = 500
+const defaultError = http.StatusInternalServerError
 
 // errorNames is a slice of special error names (or better, their prefixes).
 // First element is default error name.
