@@ -126,6 +126,19 @@ func (s *Server) HandleHttp(mux *http.ServeMux) {
 	mux.Handle(s.root, s)
 }
 
+// A type to contain arbitrary non-error values that are passed into panic()
+type panicError struct {
+	Message string
+}
+
+func (p *panicError) Error() string {
+	return p.Message
+}
+
+func (p *panicError) HTTPStatus() int {
+	return http.StatusInternalServerError
+}
+
 // ServeHTTP is Server's implementation of http.Handler interface.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := NewContext(r)
@@ -178,6 +191,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defer func() {
+		if panicData := recover(); panicData != nil {
+			if err, ok := panicData.(error); ok {
+				writeError(w, err)
+			} else {
+				writeError(w, &panicError{
+					Message: "An unknown internal error occured.",
+				})
+			}
+		}
+	}()
 	// Initialize RPC method response and call method's function
 	resp := reflect.New(methodSpec.RespType)
 	errValue := methodSpec.method.Func.Call([]reflect.Value{
