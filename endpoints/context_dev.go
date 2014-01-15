@@ -58,11 +58,11 @@ func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
 
 	switch {
 	case ti.ExpiresIn <= 0:
-		return nil, errors.New("Token is expired")
+		return nil, errors.New("API error 2 (user: NOT_ALLOWED)")
 	case ti.Email == "":
-		return nil, fmt.Errorf("Invalid email address")
+		return nil, errors.New("API error 2 (user: NOT_ALLOWED)")
 	case !ti.VerifiedEmail:
-		return nil, fmt.Errorf("Unverified email %q", ti.Email)
+		return nil, errors.New("API error 2 (user: NOT_ALLOWED)")
 	}
 
 	return ti, err
@@ -73,7 +73,7 @@ func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
 func getScopedTokeninfo(c Context, scope string) (*tokeninfo, error) {
 	token := getToken(c.HttpRequest())
 	if token == "" {
-		return nil, errors.New("No token found")
+		return nil, errors.New("API error 2 (user: NOT_ALLOWED)")
 	}
 	ti, err := fetchTokeninfo(c, token)
 	if err != nil {
