@@ -13,6 +13,7 @@ import (
 	"strings"
 	// Mainly for debug logging
 	"io/ioutil"
+	"runtime/debug"
 )
 
 // This interface defines an error that is capable of setting an HTTP code.
@@ -193,13 +194,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		if panicData := recover(); panicData != nil {
-			if err, ok := panicData.(error); ok {
-				writeError(w, err)
-			} else {
-				writeError(w, &panicError{
-					Message: "An unknown internal error occured.",
-				})
-			}
+			c.Criticalf("Recovered from panic: %s\n%s", panicData, string(debug.Stack()))
+			writeError(w, &panicError{
+				Message: "An unknown internal error occured.",
+			})
 		}
 	}()
 	// Initialize RPC method response and call method's function
