@@ -59,10 +59,10 @@ func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
 	switch {
 	case ti.ExpiresIn <= 0:
 		return nil, errors.New("Token is expired")
-	case !ti.VerifiedEmail:
-		return nil, fmt.Errorf("Unverified email %q", ti.Email)
 	case ti.Email == "":
 		return nil, fmt.Errorf("Invalid email address")
+	case !ti.VerifiedEmail:
+		return nil, fmt.Errorf("Unverified email %q", ti.Email)
 	}
 
 	return ti, err
