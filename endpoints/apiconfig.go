@@ -590,15 +590,14 @@ const endpointsTagName = "endpoints"
 // parseTag parses "endpoints" field tag into endpointsTag struct.
 //
 //   type MyMessage struct {
-//       SomeField int `endpoints:"req,min=0,max=100,desc="Int field"`
-//       WithDefault string `endpoints:"d=Hello gopher"`
+//       SomeField int `endpoints:"req,min=0,max=100" endpoints_desc:"Int field"`
+//       WithDefault string `endpoints_desc:"Hello gopher"`
 //   }
 //
 //   - req, required (boolean)
 //   - d=val, default value
 //   - min=val, min value
 //   - max=val, max value
-//   - desc=val, description
 //
 // It is an error to specify both default and required.
 func parseTag(t reflect.StructTag) (*endpointsTag, error) {
@@ -622,8 +621,6 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 					eTag.minVal = kv[1]
 				case "max":
 					eTag.maxVal = kv[1]
-				case "desc":
-					eTag.desc = kv[1]
 				}
 			}
 		}
@@ -632,6 +629,9 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 				"Can't have both required and default (%#v)",
 				eTag.defaultVal)
 		}
+	}
+	if description := t.Get("endpoints_desc"); description != "" {
+		eTag.desc = description
 	}
 	return eTag, nil
 }
