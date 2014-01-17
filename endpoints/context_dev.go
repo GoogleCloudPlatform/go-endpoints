@@ -112,7 +112,7 @@ func (c *tokeninfoContext) CurrentOAuthUser(scope string) (*user.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &user.User{Email: ti.Email}, nil
+	return &user.User{ID: ti.UserId, Email: ti.Email}, nil
 }
 
 // tokeninfoContextFactory creates a new tokeninfoContext from r.
