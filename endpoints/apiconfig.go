@@ -73,6 +73,8 @@ type ApiRequestParamSpec struct {
 	// only for int32/int64/uint32/uint64
 	Min interface{} `json:"minValue,omitempty"`
 	Max interface{} `json:"maxValue,omitempty"`
+
+	Desc string `json:"description,omitempty"`
 }
 
 type ApiEnumParamSpec struct {
@@ -517,7 +519,7 @@ func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err e
 		return nil, fmt.Errorf("Tag error on %#v: %s", field, err)
 	}
 
-	p.Required = tag.required
+	p.Required, p.Desc = tag.required, tag.desc
 	if p.Default, err = parseValue(tag.defaultVal, kind); err != nil {
 		return
 	}
@@ -605,7 +607,7 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 		parts := strings.Split(tag, ",")
 		for _, k := range parts {
 			switch k {
-			case "req":
+			case "req", "required":
 				eTag.required = true
 			default:
 				// key=value format

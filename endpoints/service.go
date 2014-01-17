@@ -242,7 +242,7 @@ func requiredParamNames(t reflect.Type) []string {
 			if field.PkgPath == "" {
 				parts := strings.Split(field.Tag.Get("endpoints"), ",")
 				for _, p := range parts {
-					if p == "required" {
+					if p == "required" || p == "req" {
 						params = append(params, field.Name)
 						break
 					}
