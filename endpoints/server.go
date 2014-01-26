@@ -15,48 +15,6 @@ import (
 	"io/ioutil"
 )
 
-// errorResponse is SPI-compatible error response
-type errorResponse struct {
-	// Currently always "APPLICATION_ERROR"
-	State string `json:"state"`
-	Name  string `json:"error_name"`
-	Msg   string `json:"error_message,omitempty"`
-}
-
-// errorNames is a slice of special error names (or better, their prefixes).
-// First element is default error name.
-// See newErrorResponse method for details.
-var errorNames = []string{
-	"Internal Server Error",
-	"Bad Request",
-	"Unauthorized",
-	"Forbidden",
-	"Not Found",
-}
-
-// Creates and initializes a new errorResponse.
-// If msg contains any of errorNames then errorResponse.Name will be set
-// to that name and the rest of the msg becomes errorResponse.Msg.
-// Otherwise, a default error name is used and msg argument
-// is errorResponse.Msg.
-func newErrorResponse(msg string) *errorResponse {
-	if msg == "" {
-		return &errorResponse{State: "APPLICATION_ERROR", Name: errorNames[0]}
-	}
-	err := &errorResponse{State: "APPLICATION_ERROR"}
-	for _, name := range errorNames {
-		if strings.HasPrefix(msg, name) {
-			err.Name = name
-			err.Msg = msg[len(name):]
-		}
-	}
-	if err.Name == "" {
-		err.Name = errorNames[0]
-		err.Msg = msg
-	}
-	return err
-}
-
 // Server serves registered RPC services using registered codecs.
 type Server struct {
 	root     string
@@ -190,13 +148,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp.Interface()); err != nil {
 		writeError(w, err)
 	}
-}
-
-// writeError writes SPI-compatible error response.
-func writeError(w http.ResponseWriter, err error) {
-	errResp := newErrorResponse(err.Error())
-	w.WriteHeader(400)
-	json.NewEncoder(w).Encode(errResp)
 }
 
 // DefaultServer is the default RPC server, so you don't have to explicitly
