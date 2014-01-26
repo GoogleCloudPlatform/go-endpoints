@@ -30,6 +30,34 @@ func (s *ServerTestService) Msg(r *http.Request, req, resp *msg) error {
 	return nil
 }
 
+func (s *ServerTestService) CustomApiError(r *http.Request, req, resp *msg) error {
+	return NewApiError("MethodNotAllowed", "MethodNotAllowed", http.StatusMethodNotAllowed)
+}
+
+func (s *ServerTestService) InternalServer(r *http.Request, req, resp *msg) error {
+	return InternalServerError
+}
+
+func (s *ServerTestService) BadRequest(r *http.Request, req, resp *msg) error {
+	return BadRequestError
+}
+
+func (s *ServerTestService) NotFound(r *http.Request, req, resp *msg) error {
+	return NotFoundError
+}
+
+func (s *ServerTestService) Forbidden(r *http.Request, req, resp *msg) error {
+	return ForbiddenError
+}
+
+func (s *ServerTestService) Unauthorized(r *http.Request, req, resp *msg) error {
+	return UnauthorizedError
+}
+
+func (s *ServerTestService) Conflict(r *http.Request, req, resp *msg) error {
+	return ConflictError
+}
+
 func TestServerServeHTTP(t *testing.T) {
 	myService := &ServerTestService{}
 	rpc := &RpcService{
@@ -63,6 +91,13 @@ func TestServerServeHTTP(t *testing.T) {
 		{"POST", "Error", `{}`, ``, http.StatusBadRequest},
 		{"POST", "Msg", ``, ``, http.StatusBadRequest},
 		{"POST", "DoesNotExist", `{}`, ``, http.StatusBadRequest},
+
+		{"POST", "InternalServer", `{}`, ``, http.StatusInternalServerError},
+		{"POST", "BadRequest", `{}`, ``, http.StatusBadRequest},
+		{"POST", "NotFound", `{}`, ``, http.StatusNotFound},
+		{"POST", "Forbidden", `{}`, ``, http.StatusForbidden},
+		{"POST", "Unauthorized", `{}`, ``, http.StatusUnauthorized},
+		{"POST", "CustomApiError", `{}`, ``, http.StatusMethodNotAllowed},
 
 		{"GET", "Void", `{}`, ``, http.StatusBadRequest},
 		{"PUT", "Void", `{}`, ``, http.StatusBadRequest},
