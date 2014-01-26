@@ -110,7 +110,7 @@ type serviceMap struct {
 }
 
 // register adds a new service using reflection to extract its methods.
-// 
+//
 // internal == true indicase that this is an internal service,
 // e.g. BackendService
 func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault, internal bool) (
