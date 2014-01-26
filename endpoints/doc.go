@@ -125,7 +125,7 @@ where ListReq and ItemsList are defined as follows:
 	    Next  *QueryMarker `json:"next,omitempty"`
 	}
 
-What's interesting here is ListReq.Cursor and ItemsList.Next fields which are
+What's interesting here is ListReq.Page and ItemsList.Next fields which are
 of type QueryMarker:
 
 	import "appengine/datastore"
