@@ -13,7 +13,14 @@ import (
 	"strings"
 	// Mainly for debug logging
 	"io/ioutil"
+	"runtime/debug"
 )
+
+// This interface defines an error that is capable of setting an HTTP code.
+type StatusError interface {
+	error
+	HTTPStatus() int
+}
 
 // errorResponse is SPI-compatible error response
 type errorResponse struct {
@@ -23,15 +30,18 @@ type errorResponse struct {
 	Msg   string `json:"error_message,omitempty"`
 }
 
+// This is the default error returned
+const defaultError = http.StatusBadRequest
+
 // errorNames is a slice of special error names (or better, their prefixes).
 // First element is default error name.
 // See newErrorResponse method for details.
-var errorNames = []string{
-	"Internal Server Error",
-	"Bad Request",
-	"Unauthorized",
-	"Forbidden",
-	"Not Found",
+var errorNames = map[int]string{
+	http.StatusInternalServerError: "Internal Server Error",
+	http.StatusBadRequest:          "Bad Request",
+	http.StatusUnauthorized:        "Unauthorized",
+	http.StatusForbidden:           "Forbidden",
+	http.StatusNotFound:            "Not Found",
 }
 
 // Creates and initializes a new errorResponse.
@@ -39,22 +49,20 @@ var errorNames = []string{
 // to that name and the rest of the msg becomes errorResponse.Msg.
 // Otherwise, a default error name is used and msg argument
 // is errorResponse.Msg.
-func newErrorResponse(msg string) *errorResponse {
-	if msg == "" {
-		return &errorResponse{State: "APPLICATION_ERROR", Name: errorNames[0]}
+func newErrorResponse(msg string, status int) (*errorResponse, int) {
+	err := &errorResponse{State: "APPLICATION_ERROR", Name: http.StatusText(defaultError), Msg: msg}
+	if statusText := http.StatusText(status); len(statusText) > 0 {
+		err.Name = statusText
+		return err, status
 	}
-	err := &errorResponse{State: "APPLICATION_ERROR"}
-	for _, name := range errorNames {
-		if strings.HasPrefix(msg, name) {
-			err.Name = name
-			err.Msg = msg[len(name):]
+	for statusCode, prefix := range errorNames {
+		if strings.HasPrefix(msg, prefix) {
+			err.Name = prefix
+			err.Msg = msg[len(prefix):]
+			return err, statusCode
 		}
 	}
-	if err.Name == "" {
-		err.Name = errorNames[0]
-		err.Msg = msg
-	}
-	return err
+	return err, defaultError
 }
 
 // Server serves registered RPC services using registered codecs.
@@ -119,6 +127,19 @@ func (s *Server) HandleHttp(mux *http.ServeMux) {
 	mux.Handle(s.root, s)
 }
 
+// A type to contain arbitrary non-error values that are passed into panic()
+type panicError struct {
+	Message string
+}
+
+func (p *panicError) Error() string {
+	return p.Message
+}
+
+func (p *panicError) HTTPStatus() int {
+	return http.StatusInternalServerError
+}
+
 // ServeHTTP is Server's implementation of http.Handler interface.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := NewContext(r)
@@ -171,6 +192,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defer func() {
+		if panicData := recover(); panicData != nil {
+			c.Criticalf("Recovered from panic: %s\n%s", panicData, string(debug.Stack()))
+			writeError(w, &panicError{
+				Message: "An unknown internal error occured.",
+			})
+		}
+	}()
 	// Initialize RPC method response and call method's function
 	resp := reflect.New(methodSpec.RespType)
 	errValue := methodSpec.method.Func.Call([]reflect.Value{
@@ -194,8 +223,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // writeError writes SPI-compatible error response.
 func writeError(w http.ResponseWriter, err error) {
-	errResp := newErrorResponse(err.Error())
-	w.WriteHeader(400)
+	var errResp *errorResponse
+	var status int
+	if statusError, ok := err.(StatusError); ok {
+		desiredStatus := statusError.HTTPStatus()
+		errResp, status = newErrorResponse(err.Error(), desiredStatus)
+	} else {
+		errResp, status = newErrorResponse(err.Error(), 0)
+	}
+	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(errResp)
 }
 

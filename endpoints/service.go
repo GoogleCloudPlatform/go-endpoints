@@ -110,7 +110,7 @@ type serviceMap struct {
 }
 
 // register adds a new service using reflection to extract its methods.
-// 
+//
 // internal == true indicase that this is an internal service,
 // e.g. BackendService
 func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault, internal bool) (
@@ -242,7 +242,7 @@ func requiredParamNames(t reflect.Type) []string {
 			if field.PkgPath == "" {
 				parts := strings.Split(field.Tag.Get("endpoints"), ",")
 				for _, p := range parts {
-					if p == "required" {
+					if p == "required" || p == "req" {
 						params = append(params, field.Name)
 						break
 					}

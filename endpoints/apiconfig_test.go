@@ -46,7 +46,7 @@ var _ = json.Marshaler((*canMarshal)(nil))
 var _ = json.Unmarshaler((*canMarshal)(nil))
 
 type DummyMsg struct {
-	String    string   `json:"str" endpoints:"req,desc=A string field"`
+	String    string   `json:"str" endpoints:"req" endpoints_desc:"A string field"`
 	Int       int      `json:"i" endpoints:"min=-200,max=200,d=-100"`
 	Uint      uint     `endpoints:"min=0,max=100"`
 	Int64     int64    `endpoints:"d=123"`
@@ -596,8 +596,8 @@ func TestParseValue(t *testing.T) {
 func TestParseTag(t *testing.T) {
 	type s struct {
 		Empty   string
-		Ignored string `endpoints:"req,ignored_part,desc=Some field"`
-		Opt     int    `endpoints:"d=123,min=1,max=200,desc=Int field"`
+		Ignored string `endpoints:"req,ignored_part" endpoints_desc:"Some field"`
+		Opt     int    `endpoints:"d=123,min=1,max=200" endpoints_desc:"Int field"`
 		Invalid uint   `endpoints:"req,d=100"`
 	}
 

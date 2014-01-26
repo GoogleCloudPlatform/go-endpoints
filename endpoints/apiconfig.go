@@ -73,6 +73,8 @@ type ApiRequestParamSpec struct {
 	// only for int32/int64/uint32/uint64
 	Min interface{} `json:"minValue,omitempty"`
 	Max interface{} `json:"maxValue,omitempty"`
+
+	Desc string `json:"description,omitempty"`
 }
 
 type ApiEnumParamSpec struct {
@@ -517,7 +519,7 @@ func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err e
 		return nil, fmt.Errorf("Tag error on %#v: %s", field, err)
 	}
 
-	p.Required = tag.required
+	p.Required, p.Desc = tag.required, tag.desc
 	if p.Default, err = parseValue(tag.defaultVal, kind); err != nil {
 		return
 	}
@@ -588,15 +590,14 @@ const endpointsTagName = "endpoints"
 // parseTag parses "endpoints" field tag into endpointsTag struct.
 //
 //   type MyMessage struct {
-//       SomeField int `endpoints:"req,min=0,max=100,desc="Int field"`
-//       WithDefault string `endpoints:"d=Hello gopher"`
+//       SomeField int `endpoints:"req,min=0,max=100" endpoints_desc:"Int field"`
+//       WithDefault string `endpoints_desc:"Hello gopher"`
 //   }
 //
 //   - req, required (boolean)
 //   - d=val, default value
 //   - min=val, min value
 //   - max=val, max value
-//   - desc=val, description
 //
 // It is an error to specify both default and required.
 func parseTag(t reflect.StructTag) (*endpointsTag, error) {
@@ -605,7 +606,7 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 		parts := strings.Split(tag, ",")
 		for _, k := range parts {
 			switch k {
-			case "req":
+			case "req", "required":
 				eTag.required = true
 			default:
 				// key=value format
@@ -620,8 +621,6 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 					eTag.minVal = kv[1]
 				case "max":
 					eTag.maxVal = kv[1]
-				case "desc":
-					eTag.desc = kv[1]
 				}
 			}
 		}
@@ -630,6 +629,9 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 				"Can't have both required and default (%#v)",
 				eTag.defaultVal)
 		}
+	}
+	if description := t.Get("endpoints_desc"); description != "" {
+		eTag.desc = description
 	}
 	return eTag, nil
 }

@@ -1,6 +1,6 @@
 // Default implementation of Context interface.
 // You can swap this with a stub implementation in tests like so:
-// 
+//
 //		func stubContextFactory(r *http.Request) endpoints.Context {
 //			// Create a stub which implements (or probably fakes)
 //			// endpoints.Context
@@ -72,7 +72,7 @@ func getOAuthResponse(c *cachingContext, scope string) (*pb.GetOAuthUserResponse
 	return res, nil
 }
 
-// HttpRequest returns the request associated with this context.	
+// HttpRequest returns the request associated with this context.
 func (c *cachingContext) HttpRequest() *http.Request {
 	return c.r
 }
@@ -88,7 +88,7 @@ func (c *cachingContext) CurrentOAuthClientID(scope string) (string, error) {
 
 // CurrentOAuthUser returns a user of this request for the given scope.
 // It caches OAuth info at the first call for future invocations.
-// 
+//
 // Returns an error if data for this scope is not available.
 func (c *cachingContext) CurrentOAuthUser(scope string) (*user.User, error) {
 	res, err := getOAuthResponse(c, scope)

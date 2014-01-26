@@ -104,7 +104,7 @@ http://localhost:8080/_ah/api/explorer
 Custom types
 
 You can define your own types and use them directly as a field type in a
-service method request/response as long as they implement json.Marshaler and 
+service method request/response as long as they implement json.Marshaler and
 json.Unmarshaler interfaces.
 
 Let's say we have this method:
@@ -249,9 +249,9 @@ clients know what a service method data constraints are (on input):
 Let's see an example:
 
 	type TaggedStruct struct {
-	    A int    `endpoints:"req,min=0,max=100,desc=An int field"`
+	    A int    `endpoints:"req,min=0,max=100" endpoints_desc:"An int field"`
 	    B int    `endpoints:"d=10,min=1,max=200"`
-	    C string `endpoints:"req,d=Hello gopher,desc=A string field"`
+	    C string `endpoints:"req,d=Hello gopher" endpoints_desc:"A string field"`
 	}
 
 	- A field is required and has min & max constrains, is described as "An int field"
@@ -282,9 +282,9 @@ Naturally, you can combine json and endpoints tags to use a struct for both
 input and output:
 
 	type TaggedStruct struct {
-	    A       int    `endpoints:"req,min=0,max=100,desc=An int field"`
+	    A       int    `endpoints:"req,min=0,max=100" endpoints_desc:"An int field"`
 	    B       int    `json:"myB" endpoints:"d=10,min=1,max=200"`
-	    C       string `json:"c" endpoints:"req,d=Hello gopher,desc=A string field"`
+	    C       string `json:"c" endpoints:"req,d=Hello gopher" endpoints_desc:"A string field"`
 	    Skipped int    `json:"-"`
 	}
 

@@ -43,7 +43,7 @@ var (
 
 	// This is a variable on purpose: can be stubbed with a different (fake)
 	// implementation during tests.
-	// 
+	//
 	// endpoints package code should always call jwtParser()
 	// instead of directly invoking verifySignedJwt().
 	jwtParser = verifySignedJwt
@@ -68,7 +68,7 @@ var (
 type Context interface {
 	appengine.Context
 
-	// HttpRequest returns the request associated with this context.	
+	// HttpRequest returns the request associated with this context.
 	HttpRequest() *http.Request
 
 	// CurrentOAuthClientID returns a clientId associated with the scope.
@@ -104,7 +104,7 @@ func destroyContext(c Context) {
 }
 
 // getToken looks for Authorization header and returns a token.
-// 
+//
 // Returns empty string if req does not contain authorization header
 // or its value is not prefixed with allowedAuthSchemesUpper.
 func getToken(req *http.Request) string {
@@ -148,7 +148,7 @@ func getMaxAge(s string) int {
 
 // getCertExpirationTime computes a cert freshness based on Cache-Control
 // and Age headers of h.
-// 
+//
 // Returns 0 if one of the required headers is not present or cert lifetime
 // is expired.
 func getCertExpirationTime(h http.Header) time.Duration {
@@ -291,18 +291,18 @@ func contains(strList []string, value string) bool {
 }
 
 // verifySignedJwt decodes and verifies JWT token string.
-// 
+//
 // Verification is based on
 //   - a certificate exponent and modulus
 //   - expiration and issue timestamps ("exp" and "iat" fields)
-// 
+//
 // This method expects JWT token string to be in the standard format, e.g. as
 // read from Authorization request header: "<header>.<payload>.<signature>",
 // where all segments are encoded with URL-base64.
-// 
+//
 // The caller is responsible for performing further token verification.
 // (Issuer, Audience, ClientID, etc.)
-// 
+//
 // NOTE: do not call this function directly, use jwtParser() instead.
 func verifySignedJwt(c Context, jwt string, now int64) (*signedJWT, error) {
 	segments := strings.Split(jwt, ".")
@@ -409,7 +409,7 @@ func verifySignedJwt(c Context, jwt string, now int64) (*signedJWT, error) {
 
 // verifyParsedToken performs further verification of a parsed JWT token and
 // checks for the validity of Issuer, Audience, ClientID and Email fields.
-// 
+//
 // Returns true if token passes verification and can be accepted as indicated
 // by audiences and clientIDs args.
 func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs []string) bool {
@@ -457,7 +457,7 @@ func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs
 
 // currentIDTokenUser returns "appengine/user".User object if provided JWT token
 // was successfully decoded and passed all verifications.
-// 
+//
 // Currently, only Email field will be set in case of success.
 func currentIDTokenUser(c Context, jwt string, audiences []string, clientIDs []string, now int64) (*user.User, error) {
 	parsedToken, err := jwtParser(c, jwt, now)
@@ -475,9 +475,9 @@ func currentIDTokenUser(c Context, jwt string, audiences []string, clientIDs []s
 }
 
 // CurrentBearerTokenScope compares given scopes and clientIDs with those in c.
-// 
+//
 // Both scopes and clientIDs args must have at least one element.
-// 
+//
 // Returns a single scope (one of provided scopes) if the two conditions are met:
 //   - it is found in Context c
 //   - client ID on that scope matches one of clientIDs in the args
@@ -501,9 +501,9 @@ func CurrentBearerTokenScope(c Context, scopes []string, clientIDs []string) (st
 
 // CurrentBearerTokenUser returns a user associated with the request which is
 // expected to have a Bearer token.
-// 
+//
 // Both scopes and clientIDs must have at least one element.
-// 
+//
 // Returns an error if the client did not make a valid request, or none of
 // clientIDs are allowed to make requests, or user did not authorize any of
 // the scopes.
@@ -517,10 +517,10 @@ func CurrentBearerTokenUser(c Context, scopes []string, clientIDs []string) (*us
 }
 
 // CurrentUser checks for both JWT and Bearer tokens.
-// 
+//
 // It first tries to decode and verify JWT token (if conditions are met)
 // and falls back to Bearer token.
-// 
+//
 // NOTE: Currently, returned user will have only Email field set when JWT is used.
 func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []string) (*user.User, error) {
 	// The user hasn't provided any information to allow us to parse either
