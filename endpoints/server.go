@@ -118,6 +118,27 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+
+	// Body of the JSON endpoints request might be embedded in resource tag
+	var mapSrc, mapDest map[string]interface{}
+	if err := json.Unmarshal(body, &mapSrc); err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, found := mapSrc["resource"]; found && len(mapSrc) == 1 {
+		c.Debugf("Exploding SPI request body")
+		mapDest = mapSrc["resource"].(map[string]interface{})
+		mapCopy := make(map[string]interface{})
+		for k, v := range mapDest {
+			mapCopy[k] = v
+		}
+		mapDest["resource"] = mapCopy
+		if body, err = json.Marshal(mapDest); err != nil { // New body should have exploded resource object
+			writeError(w, err)
+			return
+		}
+	}
+
 	c.Debugf("SPI request body: %s", body)
 
 	// if err := json.NewDecoder(r.Body).Decode(req.Interface()); err != nil {
