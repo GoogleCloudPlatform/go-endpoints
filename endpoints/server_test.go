@@ -2,13 +2,14 @@ package endpoints
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 
-	tu "github.com/crhym3/aegot/testutils"
+	"appengine/aetest"
 )
 
 type msg struct {
@@ -59,6 +60,12 @@ func (s *ServerTestService) Conflict(r *http.Request, req, resp *msg) error {
 }
 
 func TestServerServeHTTP(t *testing.T) {
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatalf("Failed to create instance: %v", err)
+	}
+	defer inst.Close()
+
 	myService := &ServerTestService{}
 	rpc := &RpcService{
 		name:     "ServerTestService",
@@ -107,16 +114,16 @@ func TestServerServeHTTP(t *testing.T) {
 
 	for i, tt := range tts {
 		path := "/" + rpc.name + "." + tt.srvMethod
-		r, delAppengineCtx := tu.NewTestRequest(tt.httpVerb, path, []byte(tt.in))
-		defer delAppengineCtx()
-		w := httptest.NewRecorder()
-
-		// make sure endpoints.NewContext is called at least once
-		// and verify it's not nil, just in case.
-		if c := NewContext(r); c == nil {
-			t.Errorf("%d: got nil context!", i)
-			continue
+		var body io.Reader
+		if tt.httpVerb == "POST" || tt.httpVerb == "PUT" {
+			body = strings.NewReader(tt.in)
 		}
+		var r *http.Request
+		if r, err = inst.NewRequest(tt.httpVerb, path, body); err != nil {
+			t.Fatalf("Failed to create req: %v", r)
+		}
+
+		w := httptest.NewRecorder()
 
 		// do the fake request
 		server.ServeHTTP(w, r)

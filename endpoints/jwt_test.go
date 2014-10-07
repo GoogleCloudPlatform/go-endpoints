@@ -5,12 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"appengine"
 	"appengine/memcache"
-
-	mc_pb "appengine_internal/memcache"
-	"code.google.com/p/goprotobuf/proto"
-
-	tu "github.com/crhym3/aegot/testutils"
 )
 
 var jwtValidTokenObject = signedJWT{
@@ -115,29 +111,18 @@ const googCerts = `{
 	}]
 }`
 
-func stubMemcacheGetCerts() func() {
-	stub := func(in, out proto.Message, _ *tu.RpcCallOptions) error {
-		req := in.(*mc_pb.MemcacheGetRequest)
-		if req.GetNameSpace() == certNamespace &&
-			len(req.Key) == 1 && string(req.Key[0]) == DefaultCertUri {
-
-			item := &mc_pb.MemcacheGetResponse_Item{
-				Key:   req.Key[0],
-				Value: []byte(googCerts),
-			}
-			resp := out.(*mc_pb.MemcacheGetResponse)
-			resp.Item = []*mc_pb.MemcacheGetResponse_Item{item}
-			return nil
-		}
-		return memcache.ErrCacheMiss
-	}
-	return tu.RegisterAPIOverride("memcache", "Get", stub)
-}
-
 func TestVerifySignedJwt(t *testing.T) {
-	defer stubMemcacheGetCerts()()
-	r, deleteAppengineContext := tu.NewTestRequest("GET", "/", nil)
-	defer deleteAppengineContext()
+	r, _, closer := newTestRequest(t, "GET", "/", nil)
+	defer closer()
+	nc, err := appengine.Namespace(appengine.NewContext(r), certNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	item := &memcache.Item{Key: DefaultCertUri, Value: []byte(googCerts)}
+	if err := memcache.Set(nc, item); err != nil {
+		t.Fatal(err)
+	}
 
 	tts := []struct {
 		token    string
@@ -153,10 +138,10 @@ func TestVerifySignedJwt(t *testing.T) {
 		{"another.invalid.token", jwtValidTokenTime, nil},
 	}
 
-	c := NewContext(r)
+	ec := NewContext(r)
 
 	for i, tt := range tts {
-		jwt, err := verifySignedJwt(c, tt.token, tt.now.Unix())
+		jwt, err := verifySignedJwt(ec, tt.token, tt.now.Unix())
 		switch {
 		case err != nil && tt.expected != nil:
 			t.Errorf("%d: didn't expect error: %v", i, err)
@@ -189,9 +174,8 @@ func TestVerifyParsedToken(t *testing.T) {
 		{"", clientId, clientId, email, false},
 	}
 
-	r, deleteCtx := tu.NewTestRequest("GET", "/", nil)
-	defer deleteCtx()
-
+	r, _, closer := newTestRequest(t, "GET", "/", nil)
+	defer closer()
 	c := NewContext(r)
 
 	for i, tt := range tts {
@@ -214,8 +198,9 @@ func TestCurrentIDTokenUser(t *testing.T) {
 	defer func() {
 		jwtParser = jwtOrigParser
 	}()
-	r, deleteAppengineContext := tu.NewTestRequest("GET", "/", nil)
-	defer deleteAppengineContext()
+
+	r, _, closer := newTestRequest(t, "GET", "/", nil)
+	defer closer()
 	c := NewContext(r)
 
 	aud := []string{jwtValidTokenObject.Audience, jwtValidTokenObject.ClientID}

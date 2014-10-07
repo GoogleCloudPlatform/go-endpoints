@@ -18,7 +18,6 @@ import (
 
 	"appengine"
 	"appengine/memcache"
-	"appengine/urlfetch"
 	"appengine/user"
 )
 
@@ -202,14 +201,14 @@ func getCachedCerts(c Context) (*certsList, error) {
 		c.Debugf(err.Error())
 	}
 
-	client := urlfetch.Client(c)
-	resp, err := client.Get(DefaultCertUri)
+	c.Debugf("Fetching provider certs from: %s", DefaultCertUri)
+	resp, err := newHttpClient(c).Get(DefaultCertUri)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, errors.New("Could not reach Cert URI")
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Could not reach Cert URI or bad response.")
 	}
 
 	certBytes, err := ioutil.ReadAll(resp.Body)
@@ -483,19 +482,22 @@ func currentIDTokenUser(c Context, jwt string, audiences []string, clientIDs []s
 //   - client ID on that scope matches one of clientIDs in the args
 func CurrentBearerTokenScope(c Context, scopes []string, clientIDs []string) (string, error) {
 	for _, scope := range scopes {
-		clientID, err := c.CurrentOAuthClientID(scope)
+		currentClientID, err := c.CurrentOAuthClientID(scope)
 		if err != nil {
 			continue
 		}
 
 		for _, id := range clientIDs {
-			if id == clientID {
+			if id == currentClientID {
 				return scope, nil
 			}
 		}
+
 		// If none of the client IDs matches, return nil
+		c.Debugf("Couldn't find current client ID %q in %v", currentClientID, clientIDs)
 		return "", errors.New("Mismatched Client ID")
 	}
+	// No client ID found for any of the scopes
 	return "", errors.New("No valid scope")
 }
 
@@ -538,7 +540,7 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 	// we dould check if token starts with "ya29." or "1/" to decide that it
 	// is a Bearer token. This is what is done in Java.
 	if len(scopes) == 1 && scopes[0] == EmailScope && len(clientIDs) > 0 {
-		c.Infof("Checking for ID token.")
+		c.Debugf("Checking for ID token.")
 		now := currentUTC().Unix()
 		u, err := currentIDTokenUser(c, token, audiences, clientIDs, now)
 		// Only return in case of success, else pass along and try
@@ -548,7 +550,7 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 		}
 	}
 
-	c.Infof("Checking for Bearer token.")
+	c.Debugf("Checking for Bearer token.")
 	return CurrentBearerTokenUser(c, scopes, clientIDs)
 }
 

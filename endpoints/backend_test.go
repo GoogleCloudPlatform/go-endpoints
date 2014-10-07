@@ -7,12 +7,18 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/crhym3/aegot/testutils"
+	"appengine/aetest"
 )
 
 func TestInvalidAppRevision(t *testing.T) {
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatalf("Failed to create instance: %v", err)
+	}
+	defer inst.Close()
+
 	backend := &BackendService{}
-	r := newBackendHttpRequest("GetApiConfigs", nil)
+	r := newBackendHttpRequest(inst, "GetApiConfigs", nil)
 	req := &GetApiConfigsRequest{AppRevision: "invalid"}
 
 	if err := backend.GetApiConfigs(r, req, nil); err == nil {
@@ -21,9 +27,15 @@ func TestInvalidAppRevision(t *testing.T) {
 }
 
 func TestEmptyApiConfigsList(t *testing.T) {
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatalf("Failed to create instance: %v", err)
+	}
+	defer inst.Close()
+
 	server := &Server{root: "/_ah/spi", services: new(serviceMap)}
 	backend := newBackendService(server)
-	r := newBackendHttpRequest("GetApiConfigs", nil)
+	r := newBackendHttpRequest(inst, "GetApiConfigs", nil)
 	req := &GetApiConfigsRequest{}
 	resp := &ApiConfigsList{}
 
@@ -38,16 +50,15 @@ func TestEmptyApiConfigsList(t *testing.T) {
 	}
 }
 
-func newBackendHttpRequest(method string, body []byte) *http.Request {
+func newBackendHttpRequest(inst aetest.Instance, method string, body []byte) *http.Request {
 	if body == nil {
 		body = []byte{}
 	}
 	buf := bytes.NewBuffer(body)
 	url := fmt.Sprintf("/_ah/spi/BackendService.%s", method)
-	req, err := http.NewRequest("POST", url, buf)
+	req, err := inst.NewRequest("POST", url, buf)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to create req: %v", err)
 	}
-	testutils.CreateTestContext(req)
 	return req
 }
