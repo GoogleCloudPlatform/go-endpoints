@@ -57,14 +57,15 @@ type BackendService struct {
 // Responds with a list of active APIs and their configuration files.
 func (s *BackendService) GetApiConfigs(
 	r *http.Request, req *GetApiConfigsRequest, resp *ApiConfigsList) error {
-
+	c := appengine.NewContext(r)
 	if req.AppRevision != "" {
-		c := appengine.NewContext(r)
 		revision := strings.Split(appengine.VersionID(c), ".")[1]
 		if req.AppRevision != revision {
-			return fmt.Errorf(
+			err := fmt.Errorf(
 				"API backend app revision %s not the same as expected %s",
 				revision, req.AppRevision)
+			c.Errorf("%s", err)
+			return err
 		}
 	}
 
@@ -75,10 +76,12 @@ func (s *BackendService) GetApiConfigs(
 		}
 		d := &ApiDescriptor{}
 		if err := service.ApiDescriptor(d, r.Host); err != nil {
+			c.Errorf("%s", err)
 			return err
 		}
 		bytes, err := json.Marshal(d)
 		if err != nil {
+			c.Errorf("%s", err)
 			return err
 		}
 		resp.Items = append(resp.Items, string(bytes))
