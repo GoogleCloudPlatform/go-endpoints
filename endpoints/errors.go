@@ -6,6 +6,40 @@ import (
 	"strings"
 )
 
+var (
+	// errorNames is a slice of known error names (or better, their prefixes).
+	// First element is default error name.
+	// See newErrorResponse method for details.
+	errorNames = []string{
+		"Internal Server Error",
+		"Bad Request",
+		"Unauthorized",
+		"Forbidden",
+		"Not Found",
+		"Conflict",
+	}
+
+	InternalServerError = NewInternalServerError(errorNames[0])
+	BadRequestError     = NewBadRequestError(errorNames[1])
+	UnauthorizedError   = NewUnauthorizedError(errorNames[2])
+	ForbiddenError      = NewForbiddenError(errorNames[3])
+	NotFoundError       = NewNotFoundError(errorNames[4])
+	ConflictError       = NewConflictError(errorNames[5])
+
+	// errorCodes is a slice of known error codes (or better, their prefixes).
+	// Each errorCodes element corresponds to an errorNames item at the same
+	// position.
+	// See newErrorResponse method for details.
+	errorCodes = []int{
+		http.StatusInternalServerError,
+		http.StatusBadRequest,
+		http.StatusUnauthorized,
+		http.StatusForbidden,
+		http.StatusNotFound,
+		http.StatusConflict,
+	}
+)
+
 // An user api's error
 type ApiError struct {
 	Name string
@@ -53,15 +87,6 @@ func NewConflictError(msg string) error {
 	return NewApiError("Conflict", msg, http.StatusConflict)
 }
 
-var (
-	InternalServerError = NewInternalServerError("Internal Server Error")
-	BadRequestError     = NewBadRequestError("Bad Request")
-	UnauthorizedError   = NewUnauthorizedError("Unauthorized")
-	ForbiddenError      = NewForbiddenError("Forbidden")
-	NotFoundError       = NewNotFoundError("Not Found")
-	ConflictError       = NewConflictError("Conflict")
-)
-
 // errorResponse is SPI-compatible error response
 type errorResponse struct {
 	// Currently always "APPLICATION_ERROR"
@@ -69,27 +94,6 @@ type errorResponse struct {
 	Name  string `json:"error_name"`
 	Msg   string `json:"error_message,omitempty"`
 	Code  int    `json:"-"`
-}
-
-// errorNames is a slice of special error names (or better, their prefixes).
-// First element is default error name.
-// See newErrorResponse method for details.
-var errorNames = []string{
-	"Internal Server Error",
-	"Bad Request",
-	"Unauthorized",
-	"Forbidden",
-	"Not Found",
-}
-
-// errorCodes is a slice of special error codes (or better, their prefixes).
-// See newErrorResponse method for details.
-var errorCodes = []int{
-	http.StatusInternalServerError,
-	http.StatusBadRequest,
-	http.StatusUnauthorized,
-	http.StatusForbidden,
-	http.StatusNotFound,
 }
 
 // Creates and initializes a new errorResponse.
@@ -109,7 +113,8 @@ func newErrorResponse(e error) *errorResponse {
 	for i, name := range errorNames {
 		if strings.HasPrefix(msg, name) {
 			err.Name = name
-			err.Msg = msg[len(name):]
+			err.Msg = strings.TrimPrefix(msg, name)
+			err.Msg = strings.TrimSpace(strings.TrimPrefix(err.Msg, ":"))
 			err.Code = errorCodes[i]
 		}
 	}
@@ -117,6 +122,7 @@ func newErrorResponse(e error) *errorResponse {
 		err.Name = errorNames[0]
 		err.Msg = msg
 		//for compatibility, Before behavior, always return 400 HTTP Status Code.
+		// TODO(alex): where is 400 coming from?
 		err.Code = 400
 	}
 	return err
