@@ -32,6 +32,17 @@ precisely what we want to do, "unrecognized import path" errors can be safely
 ignored.
 
 
+Alternatively, use [goapp tool][goapp] from the Google App Engine SDK for Go
+to get the package:
+
+```
+GO_APPENGINE/goapp get github.com/crhym3/go-endpoints/endpoints
+```
+
+If you'll ever need to pull updates from the upstream, execute `git pull`
+from the root of this repo.
+
+
 ## Usage
 
 Declare structs which describe your data. For instance:
