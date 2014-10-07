@@ -70,6 +70,9 @@ type Context interface {
 	// HttpRequest returns the request associated with this context.
 	HttpRequest() *http.Request
 
+	// Namespace returns a replacement context that operates within the given namespace.
+	Namespace(name string) (Context, error)
+
 	// CurrentOAuthClientID returns a clientId associated with the scope.
 	CurrentOAuthClientID(scope string) (string, error)
 

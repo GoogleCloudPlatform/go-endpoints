@@ -96,6 +96,15 @@ func (c *tokeninfoContext) HttpRequest() *http.Request {
 	return c.Request().(*http.Request)
 }
 
+// Namespace returns a replacement context that operates within the given namespace.
+func (c *tokeninfoContext) Namespace(name string) (Context, error) {
+	nc, err := appengine.Namespace(c, name)
+	if err != nil {
+		return nil, err
+	}
+	return &tokeninfoContext{nc}, nil
+}
+
 // CurrentOAuthClientID returns a clientId associated with the scope.
 func (c *tokeninfoContext) CurrentOAuthClientID(scope string) (string, error) {
 	ti, err := getScopedTokeninfo(c, scope)

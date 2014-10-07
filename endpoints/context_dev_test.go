@@ -9,6 +9,8 @@ import (
 
 	"appengine"
 	"appengine/aetest"
+
+	basepb "appengine_internal/base"
 )
 
 const (
@@ -126,5 +128,24 @@ func TestTokeninfoCurrentOAuthUser(t *testing.T) {
 	}
 	if user.Email != tokeinfoEmail {
 		t.Errorf("expected email %q, got %q", tokeinfoEmail, user.ID)
+	}
+}
+
+func TestTokeinfoContextNamespace(t *testing.T) {
+	const namespace = "separated"
+
+	r, _, cleanup := newTestRequest(t, "GET", "/", nil)
+	defer cleanup()
+	c := tokeninfoContextFactory(r)
+	nc, err := c.Namespace(namespace)
+	if err != nil {
+		t.Fatalf("Namespace() returned error: %v", err)
+	}
+	ns := &basepb.StringProto{}
+	if err := nc.Call("__go__", "GetNamespace", &basepb.VoidProto{}, ns, nil); err != nil {
+		t.Fatalf("Error calling __go__.GetNamespace: %v", err)
+	}
+	if namespace != ns.GetValue() {
+		t.Errorf("expected ns %q, got %q", namespace, ns.GetValue())
 	}
 }
