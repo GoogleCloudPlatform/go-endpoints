@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"appengine"
-	"appengine/urlfetch"
 	"appengine/user"
 )
 
@@ -35,14 +34,14 @@ type tokeninfo struct {
 
 // fetchTokeninfo retrieves token info from tokeninfoEndpointUrl  (tokeninfo API)
 func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
-	client := urlfetch.Client(c)
 	url := tokeninfoEndpointUrl + "?access_token=" + token
 	c.Debugf("Fetching token info from %q", url)
-	resp, err := client.Get(url)
+	resp, err := newHttpClient(c).Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	c.Debugf("Tokeninfo replied with %s", resp.Status)
 
 	ti := &tokeninfo{}
 	if err = json.NewDecoder(resp.Body).Decode(ti); err != nil {
