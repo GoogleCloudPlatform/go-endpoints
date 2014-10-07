@@ -110,6 +110,8 @@ func newErrorResponse(e error) *errorResponse {
 		if strings.HasPrefix(msg, name) {
 			err.Name = name
 			err.Msg = msg[len(name):]
+			err.Msg = strings.TrimPrefix(err.Msg, ":")
+			err.Msg = strings.TrimSpace(err.Msg)
 			err.Code = errorCodes[i]
 		}
 	}
