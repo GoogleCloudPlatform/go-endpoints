@@ -5,10 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// curlyBrackets is used for generating the key for dups map in ApiDescriptor().
+var curlyBrackets = regexp.MustCompile("{.+}")
 
 // ApiDescriptor is the top-level struct for a single Endpoints API config.
 type ApiDescriptor struct {
@@ -147,9 +151,17 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 
 	dst.Methods = make(map[string]*ApiMethod, numMethods)
 	dst.Descriptor.Methods = make(map[string]*ApiMethodDescriptor, numMethods)
+	// Sanity check for duplicate HTTP method + path
+	dups := make(map[string]string, numMethods)
 
 	for _, m := range methods {
 		info := m.Info()
+		dupName := info.HttpMethod + curlyBrackets.ReplaceAllLiteralString(info.Path, "{}")
+		if mname, ok := dups[dupName]; ok {
+			return fmt.Errorf(`"%s %s" is already registered with %s`,
+				info.HttpMethod, info.Path, mname)
+		}
+		dups[dupName] = dst.Name + "." + info.Name
 
 		// Methods of $SCHEMA_DESCRIPTOR
 		mdescr := &ApiMethodDescriptor{serviceMethod: m}
@@ -170,7 +182,11 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 		if err != nil {
 			return err
 		}
-		dst.Methods[dst.Name+"."+info.Name] = apimeth
+		mname := dst.Name + "." + info.Name
+		if m, ok := dst.Methods[mname]; ok {
+			return fmt.Errorf("Method %q already exists as %q", mname, m.RosyMethod)
+		}
+		dst.Methods[mname] = apimeth
 	}
 
 	// Schemas of $SCHEMA_DESCRIPTOR
