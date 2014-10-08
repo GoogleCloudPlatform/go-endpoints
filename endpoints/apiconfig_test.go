@@ -544,6 +544,34 @@ func TestFieldNamesNested(t *testing.T) {
 	}
 }
 
+func TestFieldNamesAnonymous(t *testing.T) {
+	type Inner struct {
+		Msg string
+	}
+	outer := struct {
+		Inner
+		Root string
+	}{}
+
+	m := fieldNames(reflect.TypeOf(outer), false)
+
+	if len(m) != 2 {
+		t.Fatalf("Have %d fields, want 2", len(m))
+	}
+
+	if _, ok := m["Root"]; !ok {
+		t.Errorf("Wanted field named Root")
+	}
+
+	f, ok := m["Msg"]
+	if !ok {
+		t.Fatal("Wanted a field named Msg from the Inner struct")
+	}
+	if f.Type.Kind() != reflect.String {
+		t.Errorf("Have Msg kind %v, want %v", f.Type.Kind(), reflect.String)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Parse tests
 
