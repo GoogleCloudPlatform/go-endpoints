@@ -338,6 +338,46 @@ func TestApiGetListMethod(t *testing.T) {
 	}
 }
 
+func TestDuplicateMethodName(t *testing.T) {
+	dummy := &DummyService{}
+	server := NewServer("")
+	s, err := server.RegisterService(dummy, "Dummy", "v1", "A service", true)
+	if err != nil {
+		t.Fatalf("Error registering service: %s", err)
+	}
+
+	s.MethodByName("GetSub").Info().Name = "someMethod"
+	s.MethodByName("GetList").Info().Name = "someMethod"
+
+	d := &ApiDescriptor{}
+	err = s.ApiDescriptor(d, "testhost:1234")
+	if err == nil {
+		t.Fatal("Expected duplicate method error")
+	}
+	t.Logf("Dup method error: %v", err)
+}
+
+func TestDuplicateHTTPMethodPath(t *testing.T) {
+	dummy := &DummyService{}
+	server := NewServer("")
+	s, err := server.RegisterService(dummy, "Dummy", "v1", "A service", true)
+	if err != nil {
+		t.Fatalf("Error registering service: %s", err)
+	}
+
+	info := s.MethodByName("GetSub").Info()
+	info.HttpMethod, info.Path = "GET", "some/{param}/path"
+	info = s.MethodByName("GetList").Info()
+	info.HttpMethod, info.Path = "GET", "some/{param}/path"
+
+	d := &ApiDescriptor{}
+	err = s.ApiDescriptor(d, "testhost:1234")
+	if err == nil {
+		t.Fatal("Expected duplicate HTTP method + path error")
+	}
+	t.Logf("Dup method error: %v", err)
+}
+
 // ---------------------------------------------------------------------------
 // $SCHEMA_DESCRIPTOR (SCHEMAS)
 
