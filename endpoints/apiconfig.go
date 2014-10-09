@@ -167,12 +167,12 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 		mdescr := &ApiMethodDescriptor{serviceMethod: m}
 		dst.Descriptor.Methods[s.Name()+"."+m.method.Name] = mdescr
 		if !info.isBodiless() && !isEmptyStruct(m.ReqType) {
-			refId := m.ReqType.Name()
+			refId := schemaNameForType(m.ReqType)
 			mdescr.Request = &ApiSchemaRef{Ref: refId}
 			schemasToCreate[refId] = m.ReqType
 		}
 		if !isEmptyStruct(m.RespType) {
-			refId := m.RespType.Name()
+			refId := schemaNameForType(m.RespType)
 			mdescr.Response = &ApiSchemaRef{Ref: refId}
 			schemasToCreate[refId] = m.RespType
 		}
@@ -192,8 +192,8 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 	// Schemas of $SCHEMA_DESCRIPTOR
 	dst.Descriptor.Schemas = make(
 		map[string]*ApiSchemaDescriptor, len(schemasToCreate))
-	for _, t := range schemasToCreate {
-		if err := addSchemaFromType(dst.Descriptor.Schemas, t); err != nil {
+	for ref, t := range schemasToCreate {
+		if err := addSchemaFromType(dst.Descriptor.Schemas, ref, t); err != nil {
 			return err
 		}
 	}
@@ -234,19 +234,22 @@ func (md *ApiMethodDescriptor) toApiMethod(rosySrv string) (*ApiMethod, error) {
 }
 
 // addSchemaFromType creates a new ApiSchemaDescriptor from given Type t
-// and adds it to the map with the key of type's name name.
+// and adds it to the map with the key of provided ref arg.
 //
 // Returns an error if ApiSchemaDescriptor cannot be created from this Type.
-func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) error {
+func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, ref string, t reflect.Type) error {
+	if ref == "" {
+		ref = t.Name()
+	}
 	if t.Name() == "" {
 		return fmt.Errorf("Creating schema from unnamed type is currently not supported: %v", t)
 	}
-	if _, exists := dst[t.Name()]; exists {
+	if _, exists := dst[ref]; exists {
 		return nil
 	}
 
 	ensureSchemas := make(map[string]reflect.Type)
-	sd := &ApiSchemaDescriptor{Id: t.Name()}
+	sd := &ApiSchemaDescriptor{Id: ref}
 
 	switch t.Kind() {
 	// case reflect.Array:
@@ -279,7 +282,7 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) erro
 						prop.Type, prop.Format = "string", "date-time"
 
 					case typ.Kind() == reflect.Struct:
-						prop.Ref = typ.Name()
+						prop.Ref = schemaNameForType(typ)
 						ensureSchemas[prop.Ref] = typ
 					default:
 						return fmt.Errorf(
@@ -302,7 +305,7 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) erro
 				k := el.Kind()
 				// TODO(alex): Add support for reflect.Map?
 				if k == reflect.Struct {
-					prop.Items.Ref = el.Name()
+					prop.Items.Ref = schemaNameForType(el)
 					ensureSchemas[prop.Items.Ref] = el
 				} else {
 					prop.Items.Type, prop.Items.Format = typeToPropFormat(el)
@@ -324,10 +327,10 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) erro
 		}
 	}
 
-	dst[sd.Id] = sd
+	dst[ref] = sd
 
-	for _, t := range ensureSchemas {
-		if err := addSchemaFromType(dst, t); err != nil {
+	for k, t := range ensureSchemas {
+		if err := addSchemaFromType(dst, k, t); err != nil {
 			return err
 		}
 	}
@@ -373,6 +376,23 @@ var (
 	typeOfTime          = reflect.TypeOf(time.Time{})
 	typeOfBytes         = reflect.TypeOf([]byte(nil))
 	typeOfJsonMarshaler = reflect.TypeOf((*jsonMarshaler)(nil)).Elem()
+
+	// SchemaNameForType returns a name for the given schema type,
+	// used to reference schema definitions in the API descriptor.
+	//
+	// Default is to return just the type name, which does not guarantee
+	// uniqueness if you have identically named structs in different packages.
+	//
+	// You can override this function, for instance to prefix all of your schemas
+	// with a custom name. It should start from an uppercase letter and contain
+	// only [a-zA-Z0-9].
+	SchemaNameForType = func(t reflect.Type) string {
+		return t.Name()
+	}
+
+	// Make sure user-supplied version of SchemaNameForType contains only
+	// allowed characters. The rest will be removed.
+	reSchemaName = regexp.MustCompile("[^a-zA-Z0-9]")
 )
 
 // indirectType returns a type the t is pointing to or a type of the element
@@ -595,6 +615,13 @@ func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
 	}
 
 	return m
+}
+
+// schemaNameForType always returns a title version of the public method
+// SchemaNameForType.
+func schemaNameForType(t reflect.Type) string {
+	name := strings.Title(SchemaNameForType(t))
+	return reSchemaName.ReplaceAllLiteralString(name, "")
 }
 
 // ----------------------------------------------------------------------------

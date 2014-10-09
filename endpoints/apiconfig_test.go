@@ -378,6 +378,39 @@ func TestDuplicateHTTPMethodPath(t *testing.T) {
 	t.Logf("Dup method error: %v", err)
 }
 
+func TestPrefixedSchemaName(t *testing.T) {
+	const pkgpath = "GithubComCrhym3GoEndpointsEndpoints"
+
+	origSchemaNameForType := SchemaNameForType
+	defer func() { SchemaNameForType = origSchemaNameForType }()
+	SchemaNameForType = func(t reflect.Type) string {
+		// PkgPath is "github.com/crhym3/go-endpoints/endpoints"
+		return t.PkgPath() + t.Name()
+	}
+
+	d := createDescriptor(t)
+	for name, _ := range d.Descriptor.Schemas {
+		if !strings.HasPrefix(name, pkgpath) {
+			t.Errorf("expected %q to be prefixed by %q", name, pkgpath)
+		}
+	}
+
+	for mname, meth := range d.Descriptor.Methods {
+		if meth.Request != nil {
+			if !strings.HasPrefix(meth.Request.Ref, pkgpath) {
+				t.Errorf("expected request schema %q of %q to be prefixed by %q",
+					meth.Request.Ref, mname, pkgpath)
+			}
+		}
+		if meth.Response != nil {
+			if !strings.HasPrefix(meth.Response.Ref, pkgpath) {
+				t.Errorf("expected response schema %q of %q to be prefixed by %q",
+					meth.Response.Ref, mname, pkgpath)
+			}
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // $SCHEMA_DESCRIPTOR (SCHEMAS)
 
