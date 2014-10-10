@@ -378,33 +378,32 @@ func TestDuplicateHTTPMethodPath(t *testing.T) {
 }
 
 func TestPrefixedSchemaName(t *testing.T) {
-	const pkgpath = "GithubComCrhym3GoEndpointsEndpoints"
+	const prefix = "SomePrefix"
 
 	origSchemaNameForType := SchemaNameForType
 	defer func() { SchemaNameForType = origSchemaNameForType }()
 	SchemaNameForType = func(t reflect.Type) string {
-		// PkgPath is "github.com/crhym3/go-endpoints/endpoints"
-		return t.PkgPath() + t.Name()
+		return prefix + t.Name()
 	}
 
 	d := createDescriptor(t)
 	for name := range d.Descriptor.Schemas {
-		if !strings.HasPrefix(name, pkgpath) {
-			t.Errorf("HasPrefix(%q, %q) = false", name, pkgpath)
+		if !strings.HasPrefix(name, prefix) {
+			t.Errorf("HasPrefix(%q, %q) = false", name, prefix)
 		}
 	}
 
 	for mname, meth := range d.Descriptor.Methods {
 		if meth.Request != nil {
-			if !strings.HasPrefix(meth.Request.Ref, pkgpath) {
+			if !strings.HasPrefix(meth.Request.Ref, prefix) {
 				t.Errorf("HasPrefix(%q, %q) = false; request of %q",
-					meth.Request.Ref, pkgpath, mname)
+					meth.Request.Ref, prefix, mname)
 			}
 		}
 		if meth.Response != nil {
-			if !strings.HasPrefix(meth.Response.Ref, pkgpath) {
+			if !strings.HasPrefix(meth.Response.Ref, prefix) {
 				t.Errorf("HasPrefix(%q, %q) = false; response of %q",
-					meth.Response.Ref, pkgpath, mname)
+					meth.Response.Ref, prefix, mname)
 			}
 		}
 	}
