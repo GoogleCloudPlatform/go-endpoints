@@ -72,8 +72,8 @@ func getOAuthResponse(c *cachingContext, scope string) (*pb.GetOAuthUserResponse
 	return res, nil
 }
 
-// HttpRequest returns the request associated with this context.
-func (c *cachingContext) HttpRequest() *http.Request {
+// HTTPRequest returns the request associated with this context.
+func (c *cachingContext) HTTPRequest() *http.Request {
 	return c.r
 }
 
@@ -86,7 +86,7 @@ func (c *cachingContext) Namespace(name string) (Context, error) {
 	return newCachingContext(nc, c.r), nil
 }
 
-// CurrentOAuthClientID returns a clientId associated with the scope.
+// CurrentOAuthClientID returns a clientID associated with the scope.
 func (c *cachingContext) CurrentOAuthClientID(scope string) (string, error) {
 	res, err := getOAuthResponse(c, scope)
 	if err != nil {

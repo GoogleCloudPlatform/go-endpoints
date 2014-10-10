@@ -51,26 +51,26 @@ func NewServer(root string) *Server {
 //    - The method has return type error.
 //
 // All other methods are ignored.
-func (s *Server) RegisterService(srv interface{}, name, ver, desc string, isDefault bool) (*RpcService, error) {
+func (s *Server) RegisterService(srv interface{}, name, ver, desc string, isDefault bool) (*RPCService, error) {
 	return s.services.register(srv, name, ver, desc, isDefault, false)
 }
 
 // RegisterServiceWithDefaults will register provided service and will try to
 // infer Endpoints config params from its method names and types.
 // See RegisterService for details.
-func (s *Server) RegisterServiceWithDefaults(srv interface{}) (*RpcService, error) {
+func (s *Server) RegisterServiceWithDefaults(srv interface{}) (*RPCService, error) {
 	return s.RegisterService(srv, "", "", "", true)
 }
 
 // ServiceByName returns a registered service or nil if there's no service
 // registered by that name.
-func (s *Server) ServiceByName(serviceName string) *RpcService {
+func (s *Server) ServiceByName(serviceName string) *RPCService {
 	return s.services.serviceByName(serviceName)
 }
 
-// HandleHttp adds Server s to specified http.ServeMux.
+// HandleHTTP adds Server s to specified http.ServeMux.
 // If no mux is provided http.DefaultServeMux will be used.
-func (s *Server) HandleHttp(mux *http.ServeMux) {
+func (s *Server) HandleHTTP(mux *http.ServeMux) {
 	if mux == nil {
 		mux = http.DefaultServeMux
 	}
@@ -96,12 +96,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// methodName has "ServiceName.MethodName" format.
 	var methodName string
-	if idx := strings.LastIndex(r.URL.Path, "/"); idx < 0 {
+	idx := strings.LastIndex(r.URL.Path, "/")
+	if idx < 0 {
 		writeError(w, fmt.Errorf("rpc: no method in path %q", r.URL.Path))
 		return
-	} else {
-		methodName = r.URL.Path[idx+1:]
 	}
+	methodName = r.URL.Path[idx+1:]
 
 	// Get service method specs
 	serviceSpec, methodSpec, err := s.services.get(methodName)
@@ -157,20 +157,20 @@ var DefaultServer *Server
 // RegisterService registers a service using DefaultServer.
 // See Server.RegisterService for details.
 func RegisterService(srv interface{}, name, ver, desc string, isDefault bool) (
-	*RpcService, error) {
+	*RPCService, error) {
 
 	return DefaultServer.RegisterService(srv, name, ver, desc, isDefault)
 }
 
 // RegisterServiceWithDefaults registers a service using DefaultServer.
 // See Server.RegisterServiceWithDefaults for details.
-func RegisterServiceWithDefaults(srv interface{}) (*RpcService, error) {
+func RegisterServiceWithDefaults(srv interface{}) (*RPCService, error) {
 	return DefaultServer.RegisterServiceWithDefaults(srv)
 }
 
-// HandleHttp calls DefaultServer's HandleHttp method using default serve mux.
-func HandleHttp() {
-	DefaultServer.HandleHttp(nil)
+// HandleHTTP calls DefaultServer's HandleHTTP method using default serve mux.
+func HandleHTTP() {
+	DefaultServer.HandleHTTP(nil)
 }
 
 // TODO: var DefaultServer = NewServer("") won't work so it's in the init()

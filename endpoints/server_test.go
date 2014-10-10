@@ -31,8 +31,8 @@ func (s *ServerTestService) Msg(r *http.Request, req, resp *msg) error {
 	return nil
 }
 
-func (s *ServerTestService) CustomApiError(r *http.Request, req, resp *msg) error {
-	return NewApiError("MethodNotAllowed", "MethodNotAllowed", http.StatusMethodNotAllowed)
+func (s *ServerTestService) CustomAPIError(r *http.Request, req, resp *msg) error {
+	return NewAPIError("MethodNotAllowed", "MethodNotAllowed", http.StatusMethodNotAllowed)
 }
 
 func (s *ServerTestService) InternalServer(r *http.Request, req, resp *msg) error {
@@ -62,12 +62,12 @@ func (s *ServerTestService) Conflict(r *http.Request, req, resp *msg) error {
 func TestServerServeHTTP(t *testing.T) {
 	inst, err := aetest.NewInstance(nil)
 	if err != nil {
-		t.Fatalf("Failed to create instance: %v", err)
+		t.Fatalf("failed to create instance: %v", err)
 	}
 	defer inst.Close()
 
 	myService := &ServerTestService{}
-	rpc := &RpcService{
+	rpc := &RPCService{
 		name:     "ServerTestService",
 		rcvr:     reflect.ValueOf(myService),
 		rcvrType: reflect.TypeOf(myService),
@@ -82,7 +82,7 @@ func TestServerServeHTTP(t *testing.T) {
 		}
 	}
 
-	srvMap := &serviceMap{services: make(map[string]*RpcService)}
+	srvMap := &serviceMap{services: make(map[string]*RPCService)}
 	srvMap.services[rpc.name] = rpc
 	server := &Server{root: "/_ah/spi", services: srvMap}
 
@@ -104,7 +104,7 @@ func TestServerServeHTTP(t *testing.T) {
 		{"POST", "NotFound", `{}`, ``, http.StatusNotFound},
 		{"POST", "Forbidden", `{}`, ``, http.StatusForbidden},
 		{"POST", "Unauthorized", `{}`, ``, http.StatusUnauthorized},
-		{"POST", "CustomApiError", `{}`, ``, http.StatusMethodNotAllowed},
+		{"POST", "CustomAPIError", `{}`, ``, http.StatusMethodNotAllowed},
 
 		{"GET", "Void", `{}`, ``, http.StatusBadRequest},
 		{"PUT", "Void", `{}`, ``, http.StatusBadRequest},
@@ -120,7 +120,7 @@ func TestServerServeHTTP(t *testing.T) {
 		}
 		var r *http.Request
 		if r, err = inst.NewRequest(tt.httpVerb, path, body); err != nil {
-			t.Fatalf("Failed to create req: %v", r)
+			t.Fatalf("failed to create req: %v", r)
 		}
 
 		w := httptest.NewRecorder()
@@ -130,17 +130,17 @@ func TestServerServeHTTP(t *testing.T) {
 
 		// verify endpoints.context has been destroyed
 		if c, exists := ctxs[r]; exists {
-			t.Errorf("%d: expected context to be deleted: %#v", i, c)
+			t.Errorf("%d: ctxs[%#v] = %#v; want nil", i, r, c)
 		}
 
 		// make sure the response is correct
 		out := strings.TrimSpace(w.Body.String())
 		if tt.code == http.StatusOK && out != tt.out {
-			t.Errorf("%d: expected %q, got %q", i, tt.out, out)
+			t.Errorf("%d: %s %s = %q; want %q", i, tt.httpVerb, path, out, tt.out)
 		}
 		if w.Code != tt.code {
-			t.Errorf("%d: expected status code %d, got %d",
-				i, tt.code, w.Code)
+			t.Errorf("%d: %s %s w.Code = %d; want %d",
+				i, tt.httpVerb, path, w.Code, tt.code)
 		}
 	}
 }

@@ -14,18 +14,18 @@ import (
 )
 
 const (
-	tokeinfoUserId = "12345"
-	tokeinfoEmail  = "dude@gmail.com"
+	tokeinfoUserID = "12345"
+	tokeninfoEmail = "dude@gmail.com"
 )
 
 var (
 	tokeninfoValid = `{
 		"issued_to": "my-client-id",
 		"audience": "my-client-id",
-		"user_id": "` + tokeinfoUserId + `",
+		"user_id": "` + tokeinfoUserID + `",
 		"scope": "scope.one scope.two",
 		"expires_in": 3600,
-		"email": "` + tokeinfoEmail + `",
+		"email": "` + tokeninfoEmail + `",
 		"verified_email": true,
 		"access_type": "online"
 	}`
@@ -55,16 +55,16 @@ func TestTokeninfoContextCurrentOAuthClientID(t *testing.T) {
 
 	inst, err := aetest.NewInstance(nil)
 	if err != nil {
-		t.Fatalf("Failed to create instance: %v", err)
+		t.Fatalf("failed to create instance: %v", err)
 	}
 	defer inst.Close()
 
 	tts := []*struct {
-		token, scope, clientId string
+		token, scope, clientID string
 		httpStatus             int
 		content                string
 	}{
-		// token, scope, clientId, httpStatus, content
+		// token, scope, clientID, httpStatus, content
 		{"some_token0", "scope.one", "my-client-id", 200, tokeninfoValid},
 		{"some_token1", "scope.two", "my-client-id", 200, tokeninfoValid},
 		{"some_token2", "scope.one", "", 200, tokeninfoUnverified},
@@ -93,12 +93,15 @@ func TestTokeninfoContextCurrentOAuthClientID(t *testing.T) {
 		c := tokeninfoContextFactory(r)
 		id, err := c.CurrentOAuthClientID(tt.scope)
 		switch {
-		case err != nil && tt.clientId != "":
-			t.Errorf("%d: expected %q, got error %v", i, tt.clientId, err)
-		case err == nil && tt.clientId == "":
-			t.Errorf("%d (%v): expected error, got %q", i, tt, id)
-		case err == nil && id != tt.clientId:
-			t.Errorf("%d: expected %q, got %q", i, tt.clientId, id)
+		case err != nil && tt.clientID != "":
+			t.Errorf("%d: CurrentOAuthClientID(%v) = %v; want %q",
+				i, tt.scope, err, tt.clientID)
+		case err == nil && tt.clientID == "":
+			t.Errorf("%d: CurrentOAuthClientID(%v) = %v; want error",
+				i, tt.scope, id)
+		case err == nil && id != tt.clientID:
+			t.Errorf("%d: CurrentOAuthClientID(%v) = %v; want %q",
+				i, tt.scope, id, tt.clientID)
 		}
 	}
 }
@@ -120,14 +123,15 @@ func TestTokeninfoCurrentOAuthUser(t *testing.T) {
 	defer closer()
 	r.Header.Set("authorization", "bearer some_token")
 
+	const scope = "scope.one"
 	c := tokeninfoContextFactory(r)
-	user, err := c.CurrentOAuthUser("scope.one")
+	user, err := c.CurrentOAuthUser(scope)
 
 	if err != nil {
-		t.Fatalf("c.CurrentOAuthUser unexpected error: %v", err)
+		t.Fatalf("CurrentOAuthUser(%q) = %v", scope, err)
 	}
-	if user.Email != tokeinfoEmail {
-		t.Errorf("expected email %q, got %q", tokeinfoEmail, user.ID)
+	if user.Email != tokeninfoEmail {
+		t.Errorf("CurrentOAuthUser(%q) = %#v; want email = %q", scope, user, tokeninfoEmail)
 	}
 }
 
@@ -139,13 +143,13 @@ func TestTokeinfoContextNamespace(t *testing.T) {
 	c := tokeninfoContextFactory(r)
 	nc, err := c.Namespace(namespace)
 	if err != nil {
-		t.Fatalf("Namespace() returned error: %v", err)
+		t.Fatalf("Namespace(%q) = %v", namespace, err)
 	}
 	ns := &basepb.StringProto{}
 	if err := nc.Call("__go__", "GetNamespace", &basepb.VoidProto{}, ns, nil); err != nil {
-		t.Fatalf("Error calling __go__.GetNamespace: %v", err)
+		t.Fatalf("error calling __go__.GetNamespace: %v", err)
 	}
-	if namespace != ns.GetValue() {
-		t.Errorf("expected ns %q, got %q", namespace, ns.GetValue())
+	if ns.GetValue() != namespace {
+		t.Errorf("GetNamespace() = %q; want %q", ns.GetValue(), namespace)
 	}
 }

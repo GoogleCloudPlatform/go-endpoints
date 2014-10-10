@@ -13,7 +13,7 @@ var httpTransportFactory = func(c appengine.Context) http.RoundTripper {
 	return &urlfetch.Transport{Context: c}
 }
 
-// newHttpClient returns a new HTTP client using httpTransportFactory
-func newHttpClient(c appengine.Context) *http.Client {
+// newHTTPClient returns a new HTTP client using httpTransportFactory
+func newHTTPClient(c appengine.Context) *http.Client {
 	return &http.Client{Transport: httpTransportFactory(c)}
 }

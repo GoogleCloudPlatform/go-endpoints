@@ -16,12 +16,12 @@ import (
 	"appengine/user"
 )
 
-const tokeninfoEndpointUrl = "https://www.googleapis.com/oauth2/v2/tokeninfo"
+const tokeninfoEndpointURL = "https://www.googleapis.com/oauth2/v2/tokeninfo"
 
 type tokeninfo struct {
 	IssuedTo      string `json:"issued_to"`
 	Audience      string `json:"audience"`
-	UserId        string `json:"user_id"`
+	UserID        string `json:"user_id"`
 	Scope         string `json:"scope"`
 	ExpiresIn     int    `json:"expires_in"`
 	Email         string `json:"email"`
@@ -32,11 +32,11 @@ type tokeninfo struct {
 	ErrorDescription string `json:"error_description"`
 }
 
-// fetchTokeninfo retrieves token info from tokeninfoEndpointUrl  (tokeninfo API)
+// fetchTokeninfo retrieves token info from tokeninfoEndpointURL  (tokeninfo API)
 func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
-	url := tokeninfoEndpointUrl + "?access_token=" + token
+	url := tokeninfoEndpointURL + "?access_token=" + token
 	c.Debugf("Fetching token info from %q", url)
-	resp, err := newHttpClient(c).Get(url)
+	resp, err := newHTTPClient(c).Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
 // getScopedTokeninfo validates fetched token by matching tokeinfo.Scope
 // with scope arg.
 func getScopedTokeninfo(c Context, scope string) (*tokeninfo, error) {
-	token := getToken(c.HttpRequest())
+	token := getToken(c.HTTPRequest())
 	if token == "" {
 		return nil, errors.New("No token found")
 	}
@@ -92,7 +92,7 @@ type tokeninfoContext struct {
 	appengine.Context
 }
 
-func (c *tokeninfoContext) HttpRequest() *http.Request {
+func (c *tokeninfoContext) HTTPRequest() *http.Request {
 	return c.Request().(*http.Request)
 }
 
@@ -105,7 +105,7 @@ func (c *tokeninfoContext) Namespace(name string) (Context, error) {
 	return &tokeninfoContext{nc}, nil
 }
 
-// CurrentOAuthClientID returns a clientId associated with the scope.
+// CurrentOAuthClientID returns a clientID associated with the scope.
 func (c *tokeninfoContext) CurrentOAuthClientID(scope string) (string, error) {
 	ti, err := getScopedTokeninfo(c, scope)
 	if err != nil {

@@ -116,10 +116,10 @@ func init() {
   }
 
   info := api.MethodByName("List").Info()
-  info.Name, info.HttpMethod, info.Path, info.Desc =
+  info.Name, info.HTTPMethod, info.Path, info.Desc =
     "greets.list", "GET", "greetings", "List most recent greetings."
 
-  endpoints.HandleHttp()
+  endpoints.HandleHTTP()
 }
 ```
 

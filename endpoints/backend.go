@@ -21,28 +21,28 @@ const (
 	levelCritical logLevel = "critical"
 )
 
-// Request body for fetching API configs.
-type GetApiConfigsRequest struct {
+// GetAPIConfigsRequest is the request scheme for fetching API configs.
+type GetAPIConfigsRequest struct {
 	AppRevision string `json:"appRevision"`
 }
 
-// List of API configuration file contents.
-type ApiConfigsList struct {
+// APIConfigsList is the response scheme for BackendService.getApiConfigs method.
+type APIConfigsList struct {
 	Items []string `json:"items"`
 }
 
-// Request body for log messages sent by Swarm FE.
+// LogMessagesRequest is the request body for log messages sent by Swarm FE.
 type LogMessagesRequest struct {
 	Messages []*LogMessage `json:"messages"`
 }
 
-// A single log message within a LogMessagesRequest.
+// LogMessage is a single log message within a LogMessagesRequest.
 type LogMessage struct {
 	Level   logLevel `json:"level"`
 	Message string   `json:"message" endpoints:"required"`
 }
 
-// API config enumeration service used by Google API Server.
+// BackendService is an API config enumeration service used by Google API Server.
 //
 // This is a simple API providing a list of APIs served by this App Engine
 // instance. It is called by the Google API Server during app deployment
@@ -51,12 +51,12 @@ type BackendService struct {
 	server *Server // of which server
 }
 
-// GetApiConfigs creates ApiDescriptor for every registered RpcService and
+// GetApiConfigs creates APIDescriptor for every registered RPCService and
 // responds with a config suitable for generating Discovery doc.
 //
 // Responds with a list of active APIs and their configuration files.
 func (s *BackendService) GetApiConfigs(
-	r *http.Request, req *GetApiConfigsRequest, resp *ApiConfigsList) error {
+	r *http.Request, req *GetAPIConfigsRequest, resp *APIConfigsList) error {
 	c := appengine.NewContext(r)
 	if req.AppRevision != "" {
 		revision := strings.Split(appengine.VersionID(c), ".")[1]
@@ -74,8 +74,8 @@ func (s *BackendService) GetApiConfigs(
 		if service.internal {
 			continue
 		}
-		d := &ApiDescriptor{}
-		if err := service.ApiDescriptor(d, r.Host); err != nil {
+		d := &APIDescriptor{}
+		if err := service.APIDescriptor(d, r.Host); err != nil {
 			c.Errorf("%s", err)
 			return err
 		}
@@ -100,13 +100,13 @@ func (s *BackendService) LogMessages(
 	return nil
 }
 
-// This is a test method and will be removed sooner or later.
+// GetFirstConfig is a test method and will be removed sooner or later.
 func (s *BackendService) GetFirstConfig(
-	r *http.Request, _ *VoidMessage, resp *ApiDescriptor) error {
+	r *http.Request, _ *VoidMessage, resp *APIDescriptor) error {
 
 	for _, service := range s.server.services.services {
 		if !service.internal {
-			return service.ApiDescriptor(resp, r.Host)
+			return service.APIDescriptor(resp, r.Host)
 		}
 	}
 	return errors.New("Not Found: No public API found")

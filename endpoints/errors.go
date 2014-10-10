@@ -7,6 +7,22 @@ import (
 )
 
 var (
+	// Pre-defined API errors.
+	// Use NewAPIError() method to create your own.
+
+	// InternalServerError is default error with http.StatusInternalServerError (500)
+	InternalServerError = NewInternalServerError(errorNames[0])
+	// BadRequestError is default error with http.StatusBadRequest (400)
+	BadRequestError = NewBadRequestError(errorNames[1])
+	// UnauthorizedError is default error with http.StatusUnauthorized (401)
+	UnauthorizedError = NewUnauthorizedError(errorNames[2])
+	// ForbiddenError is default error with http.StatusForbidden (403)
+	ForbiddenError = NewForbiddenError(errorNames[3])
+	// NotFoundError is default error with http.StatusNotFound (404)
+	NotFoundError = NewNotFoundError(errorNames[4])
+	// ConflictError is default error with http.StatusConflict (409)
+	ConflictError = NewConflictError(errorNames[5])
+
 	// errorNames is a slice of known error names (or better, their prefixes).
 	// First element is default error name.
 	// See newErrorResponse method for details.
@@ -18,13 +34,6 @@ var (
 		"Not Found",
 		"Conflict",
 	}
-
-	InternalServerError = NewInternalServerError(errorNames[0])
-	BadRequestError     = NewBadRequestError(errorNames[1])
-	UnauthorizedError   = NewUnauthorizedError(errorNames[2])
-	ForbiddenError      = NewForbiddenError(errorNames[3])
-	NotFoundError       = NewNotFoundError(errorNames[4])
-	ConflictError       = NewConflictError(errorNames[5])
 
 	// errorCodes is a slice of known error codes (or better, their prefixes).
 	// Each errorCodes element corresponds to an errorNames item at the same
@@ -40,51 +49,51 @@ var (
 	}
 )
 
-// An user api's error
-type ApiError struct {
+// APIError is a user custom API's error
+type APIError struct {
 	Name string
 	Msg  string
 	Code int
 }
 
-// ApiError is an error
-func (a *ApiError) Error() string {
+// APIError is an error
+func (a *APIError) Error() string {
 	return a.Msg
 }
 
-// Create a new ApiError for custom error
-func NewApiError(name string, msg string, code int) error {
-	return &ApiError{Name: name, Msg: msg, Code: code}
+// NewAPIError Create a new APIError for custom error
+func NewAPIError(name string, msg string, code int) error {
+	return &APIError{Name: name, Msg: msg, Code: code}
 }
 
-// Create a new ApiError as Internal Server Error (status code:500)
+// NewInternalServerError creates a new APIError with Internal Server Error status (500)
 func NewInternalServerError(msg string) error {
-	return NewApiError("Internal Server Error", msg, http.StatusInternalServerError)
+	return NewAPIError("Internal Server Error", msg, http.StatusInternalServerError)
 }
 
-// Create a new ApiError as Bad Request (status code:400)
+// NewBadRequestError creates a new APIError with Bad Request status (400)
 func NewBadRequestError(msg string) error {
-	return NewApiError("Bad Request", msg, http.StatusBadRequest)
+	return NewAPIError("Bad Request", msg, http.StatusBadRequest)
 }
 
-// Create a new ApiError as Unauthorized (status code:401)
+// NewUnauthorizedError creates a new APIError with Unauthorized status (401)
 func NewUnauthorizedError(msg string) error {
-	return NewApiError("Unauthorized", msg, http.StatusUnauthorized)
+	return NewAPIError("Unauthorized", msg, http.StatusUnauthorized)
 }
 
-// Create a new ApiError as Not Found (status code:404)
+// NewNotFoundError creates a new APIError with Not Found status (404)
 func NewNotFoundError(msg string) error {
-	return NewApiError("Not Found", msg, http.StatusNotFound)
+	return NewAPIError("Not Found", msg, http.StatusNotFound)
 }
 
-// Create a new ApiError as Forbidden (status code:403)
+// NewForbiddenError creates a new APIError with Forbidden status (403)
 func NewForbiddenError(msg string) error {
-	return NewApiError("Forbidden", msg, http.StatusForbidden)
+	return NewAPIError("Forbidden", msg, http.StatusForbidden)
 }
 
-// Create a new ApiError as Conflict (status code:409)
+// NewConflictError creates a new APIError with Conflict status (409)
 func NewConflictError(msg string) error {
-	return NewApiError("Conflict", msg, http.StatusConflict)
+	return NewAPIError("Conflict", msg, http.StatusConflict)
 }
 
 // errorResponse is SPI-compatible error response
@@ -103,7 +112,7 @@ type errorResponse struct {
 // is errorResponse.Msg.
 func newErrorResponse(e error) *errorResponse {
 	switch t := e.(type) {
-	case *ApiError:
+	case *APIError:
 		return &errorResponse{State: "APPLICATION_ERROR", Name: t.Name, Msg: t.Msg, Code: t.Code}
 	}
 

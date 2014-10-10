@@ -22,13 +22,15 @@ import (
 )
 
 const (
-	ClockSkewSecs        = 300
-	MaxTokenLifetimeSecs = 86400
-	DefaultCertUri       = ("https://www.googleapis.com/service_accounts/" +
+	// DefaultCertURI is Google's public URL which points to JWT certs.
+	DefaultCertURI = ("https://www.googleapis.com/service_accounts/" +
 		"v1/metadata/raw/federated-signon@system.gserviceaccount.com")
-	EmailScope          = "https://www.googleapis.com/auth/userinfo.email"
-	TokeninfoUrl        = "https://www.googleapis.com/oauth2/v1/tokeninfo"
-	ApiExplorerClientId = "292824132082.apps.googleusercontent.com"
+	// EmailScope is Google's OAuth 2.0 email scope
+	EmailScope = "https://www.googleapis.com/auth/userinfo.email"
+	// TokeninfoURL is Google's OAuth 2.0 access token verification URL
+	TokeninfoURL = "https://www.googleapis.com/oauth2/v1/tokeninfo"
+	// APIExplorerClientID is the client ID of API explorer.
+	APIExplorerClientID = "292824132082.apps.googleusercontent.com"
 )
 
 var (
@@ -44,8 +46,8 @@ var (
 	// implementation during tests.
 	//
 	// endpoints package code should always call jwtParser()
-	// instead of directly invoking verifySignedJwt().
-	jwtParser = verifySignedJwt
+	// instead of directly invoking verifySignedJWT().
+	jwtParser = verifySignedJWT
 
 	// currentUTC returns current time in UTC.
 	// This is a variable on purpose to be able to stub during testing.
@@ -67,13 +69,13 @@ var (
 type Context interface {
 	appengine.Context
 
-	// HttpRequest returns the request associated with this context.
-	HttpRequest() *http.Request
+	// HTTPRequest returns the request associated with this context.
+	HTTPRequest() *http.Request
 
 	// Namespace returns a replacement context that operates within the given namespace.
 	Namespace(name string) (Context, error)
 
-	// CurrentOAuthClientID returns a clientId associated with the scope.
+	// CurrentOAuthClientID returns a clientID associated with the scope.
 	CurrentOAuthClientID(scope string) (string, error)
 
 	// CurrentOAuthUser returns a user of this request for the given scope.
@@ -102,7 +104,7 @@ func NewContext(req *http.Request) Context {
 func destroyContext(c Context) {
 	ctxsMu.Lock()
 	defer ctxsMu.Unlock()
-	delete(ctxs, c.HttpRequest())
+	delete(ctxs, c.HTTPRequest())
 }
 
 // getToken looks for Authorization header and returns a token.
@@ -181,7 +183,7 @@ func getCertExpirationTime(h http.Header) time.Duration {
 	return time.Duration(remainingTime) * time.Second
 }
 
-// getCachedCerts fetches public certificates info from DefaultCertUri and
+// getCachedCerts fetches public certificates info from DefaultCertURI and
 // caches it for the duration specified in Age header of a response.
 func getCachedCerts(c Context) (*certsList, error) {
 	namespacedContext, err := appengine.Namespace(c, certNamespace)
@@ -191,7 +193,7 @@ func getCachedCerts(c Context) (*certsList, error) {
 
 	var certs *certsList
 
-	_, err = memcache.JSON.Get(namespacedContext, DefaultCertUri, &certs)
+	_, err = memcache.JSON.Get(namespacedContext, DefaultCertURI, &certs)
 	if err == nil {
 		return certs, nil
 	}
@@ -204,8 +206,8 @@ func getCachedCerts(c Context) (*certsList, error) {
 		c.Debugf(err.Error())
 	}
 
-	c.Debugf("Fetching provider certs from: %s", DefaultCertUri)
-	resp, err := newHttpClient(c).Get(DefaultCertUri)
+	c.Debugf("Fetching provider certs from: %s", DefaultCertURI)
+	resp, err := newHTTPClient(c).Get(DefaultCertURI)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +229,7 @@ func getCachedCerts(c Context) (*certsList, error) {
 		expiration := getCertExpirationTime(resp.Header)
 		if expiration > 0 {
 			item := &memcache.Item{
-				Key:        DefaultCertUri,
+				Key:        DefaultCertURI,
 				Value:      certBytes,
 				Expiration: expiration,
 			}
@@ -292,7 +294,7 @@ func contains(strList []string, value string) bool {
 	return false
 }
 
-// verifySignedJwt decodes and verifies JWT token string.
+// verifySignedJWT decodes and verifies JWT token string.
 //
 // Verification is based on
 //   - a certificate exponent and modulus
@@ -306,7 +308,7 @@ func contains(strList []string, value string) bool {
 // (Issuer, Audience, ClientID, etc.)
 //
 // NOTE: do not call this function directly, use jwtParser() instead.
-func verifySignedJwt(c Context, jwt string, now int64) (*signedJWT, error) {
+func verifySignedJWT(c Context, jwt string, now int64) (*signedJWT, error) {
 	segments := strings.Split(jwt, ".")
 	if len(segments) != 3 {
 		return nil, fmt.Errorf("Wrong number of segments in token: %s", jwt)
@@ -534,7 +536,7 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 		return nil, errors.New("No client ID or scope info provided.")
 	}
 
-	token := getToken(c.HttpRequest())
+	token := getToken(c.HTTPRequest())
 	if token == "" {
 		return nil, errors.New("No token in the current context.")
 	}

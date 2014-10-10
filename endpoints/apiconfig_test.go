@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	dummyClientId = "dummy-client-id"
+	dummyClientID = "dummy-client-id"
 	dummyScope1   = "http://dummy.scope.1"
 	dummyScope2   = "http://dummy.scope.2"
 	dummyAudience = "people"
@@ -17,7 +17,7 @@ const (
 
 var (
 	emptySlice = []string{}
-	clientIDs  = []string{dummyClientId}
+	clientIDs  = []string{dummyClientID}
 	scopes     = []string{dummyScope1, dummyScope2}
 	audiences  = []string{dummyAudience}
 )
@@ -100,44 +100,43 @@ func (s *DummyService) GetList(*http.Request, *DummyListReq, *DummyListMsg) erro
 	return nil
 }
 
-// createDescriptor creates ApiDescriptor for DummyService.
-func createDescriptor(t *testing.T) *ApiDescriptor {
+// createDescriptor creates APIDescriptor for DummyService.
+func createDescriptor(t *testing.T) *APIDescriptor {
 	dummy := &DummyService{}
 	server := NewServer("")
 	s, err := server.RegisterService(dummy, "Dummy", "v1", "A service", true)
 	if err != nil {
-		fail(t, "Error registering service: %s", err)
-		return nil
+		t.Fatalf("createDescriptor: error registering service: %v", err)
 	}
 
 	info := s.MethodByName("Post").Info()
-	info.Name, info.Path, info.HttpMethod, info.Desc =
+	info.Name, info.Path, info.HTTPMethod, info.Desc =
 		"post", "post/{i}/{bool_field}/{Float64}", "POST", "A POST method"
 
 	info = s.MethodByName("PutAuth").Info()
-	info.Name, info.Path, info.HttpMethod, info.Desc =
+	info.Name, info.Path, info.HTTPMethod, info.Desc =
 		"auth", "auth", "PUT", "Method with auth"
 	info.ClientIds, info.Scopes, info.Audiences =
 		clientIDs, scopes, audiences
 
 	info = s.MethodByName("GetSub").Info()
-	info.Name, info.Path, info.HttpMethod, info.Desc =
+	info.Name, info.Path, info.HTTPMethod, info.Desc =
 		"sub.sub", "sub/{simple}/{msg.i}/{msg.str}", "GET", "With substruct"
 
 	info = s.MethodByName("GetList").Info()
-	info.Name, info.Path, info.HttpMethod, info.Desc =
+	info.Name, info.Path, info.HTTPMethod, info.Desc =
 		"list", "list", "GET", "Messages list"
 
-	d := &ApiDescriptor{}
-	if err := s.ApiDescriptor(d, "testhost:1234"); err != nil {
-		fail(t, "Error creating descriptor: %s", err)
+	d := &APIDescriptor{}
+	if err := s.APIDescriptor(d, "testhost:1234"); err != nil {
+		t.Fatalf("createDescriptor: error creating descriptor: %v", err)
 	}
 	return d
 }
 
-func TestApiDescriptor(t *testing.T) {
+func TestAPIDescriptor(t *testing.T) {
 	d := createDescriptor(t)
-	verifyTT(t,
+	verifyPairs(t,
 		d.Extends, "thirdParty.api",
 		d.Root, "https://testhost:1234/_ah/api",
 		d.Name, "dummy",
@@ -159,12 +158,12 @@ func TestApiPostMethod(t *testing.T) {
 	d := createDescriptor(t)
 	meth := d.Methods["dummy.post"]
 	if meth == nil {
-		t.Fatal("Expected to find ApiMethod 'dummy.post'")
+		t.Fatal("want APIMethod 'dummy.post'")
 		return
 	}
-	verifyTT(t,
+	verifyPairs(t,
 		meth.Path, "post/{i}/{bool_field}/{Float64}",
-		meth.HttpMethod, "POST",
+		meth.HTTPMethod, "POST",
 		meth.RosyMethod, "DummyService.Post",
 		meth.Request.Body, "autoTemplate(backendRequest)",
 		meth.Request.BodyName, "resource",
@@ -187,9 +186,9 @@ func TestApiPostMethod(t *testing.T) {
 		name := tt[0].(string)
 		p := params[name]
 		if p == nil {
-			t.Errorf("Couldn't find %q param in %v", name, params)
+			t.Errorf("want param %q in %v", name, params)
 		}
-		verifyTT(t,
+		verifyPairs(t,
 			p.Type, tt[1],
 			p.Required, tt[2],
 			p.Default, tt[3],
@@ -200,7 +199,7 @@ func TestApiPostMethod(t *testing.T) {
 		)
 	}
 	if lp, ltts := len(params), len(tts); lp != ltts {
-		t.Errorf("Expected %d params for %q, got %d", ltts, meth.RosyMethod, lp)
+		t.Errorf("have %d params for %q; want %d", lp, meth.RosyMethod, ltts)
 	}
 }
 
@@ -208,17 +207,17 @@ func TestApiPutAuthMethod(t *testing.T) {
 	d := createDescriptor(t)
 	meth := d.Methods["dummy.auth"]
 	if meth == nil {
-		t.Fatal("Expected to find ApiMethod 'dummy.auth'")
+		t.Fatal("want APIMethod 'dummy.auth'")
 		return
 	}
-	verifyTT(t,
-		meth.HttpMethod, "PUT",
+	verifyPairs(t,
+		meth.HTTPMethod, "PUT",
 		meth.RosyMethod, "DummyService.PutAuth",
 		meth.Request.Body, "autoTemplate(backendRequest)",
 		meth.Request.BodyName, "resource",
 		meth.Response.Body, "empty",
 		meth.Response.BodyName, "",
-		meth.ClientIds, []string{dummyClientId},
+		meth.ClientIds, []string{dummyClientID},
 		meth.Scopes, []string{dummyScope1, dummyScope2},
 		meth.Audiences, []string{dummyAudience},
 		len(meth.Request.Params), 0,
@@ -230,11 +229,11 @@ func TestApiGetSubMethod(t *testing.T) {
 	// apiname.resource.method
 	meth := d.Methods["dummy.sub.sub"]
 	if meth == nil {
-		t.Fatal("Expected to find ApiMethod 'dummy.sub.sub'")
+		t.Fatal("want APIMethod 'dummy.sub.sub'")
 	}
-	verifyTT(t,
+	verifyPairs(t,
 		meth.Path, "sub/{simple}/{msg.i}/{msg.str}",
-		meth.HttpMethod, "GET",
+		meth.HTTPMethod, "GET",
 		meth.RosyMethod, "DummyService.GetSub",
 		meth.Request.Body, "empty",
 		meth.Request.BodyName, "",
@@ -272,10 +271,10 @@ func TestApiGetSubMethod(t *testing.T) {
 		name := tt[0].(string)
 		p := params[name]
 		if p == nil {
-			t.Errorf("Couldn't find %q param in %#v", name, params)
+			t.Errorf("want param %q in %#v", name, params)
 			continue
 		}
-		verifyTT(t,
+		verifyPairs(t,
 			p.Type, tt[1],
 			p.Required, tt[2],
 			p.Default, tt[3],
@@ -287,7 +286,7 @@ func TestApiGetSubMethod(t *testing.T) {
 	}
 
 	if lp, ltts := len(params), len(tts); lp != ltts {
-		t.Errorf("Expected %d params for %q, got %d", ltts, meth.RosyMethod, lp)
+		t.Errorf("have %d params for %q; want %d", lp, meth.RosyMethod, ltts)
 	}
 }
 
@@ -295,11 +294,11 @@ func TestApiGetListMethod(t *testing.T) {
 	d := createDescriptor(t)
 	meth := d.Methods["dummy.list"]
 	if meth == nil {
-		t.Fatal("Expected to find ApiMethod 'dummy.list'")
+		t.Fatal("want APIMethod 'dummy.list'")
 		return
 	}
-	verifyTT(t,
-		meth.HttpMethod, "GET",
+	verifyPairs(t,
+		meth.HTTPMethod, "GET",
 		meth.RosyMethod, "DummyService.GetList",
 		meth.Request.Body, "empty",
 		meth.Request.BodyName, "",
@@ -320,10 +319,10 @@ func TestApiGetListMethod(t *testing.T) {
 		name := tt[0].(string)
 		p := params[name]
 		if p == nil {
-			t.Errorf("Couldn't find %q param in %v", name, params)
+			t.Errorf("want param %q in %v", name, params)
 			continue
 		}
-		verifyTT(t,
+		verifyPairs(t,
 			p.Type, tt[1],
 			p.Required, tt[2],
 			p.Default, tt[3],
@@ -334,7 +333,7 @@ func TestApiGetListMethod(t *testing.T) {
 		)
 	}
 	if lp, ltts := len(params), len(tts); lp != ltts {
-		t.Errorf("Expected %d params for %q, got %d", ltts, meth.RosyMethod, lp)
+		t.Errorf("have %d params for %q; want %d", lp, meth.RosyMethod, ltts)
 	}
 }
 
@@ -343,18 +342,18 @@ func TestDuplicateMethodName(t *testing.T) {
 	server := NewServer("")
 	s, err := server.RegisterService(dummy, "Dummy", "v1", "A service", true)
 	if err != nil {
-		t.Fatalf("Error registering service: %s", err)
+		t.Fatalf("error registering service: %v", err)
 	}
 
 	s.MethodByName("GetSub").Info().Name = "someMethod"
 	s.MethodByName("GetList").Info().Name = "someMethod"
 
-	d := &ApiDescriptor{}
-	err = s.ApiDescriptor(d, "testhost:1234")
+	d := &APIDescriptor{}
+	err = s.APIDescriptor(d, "testhost:1234")
 	if err == nil {
-		t.Fatal("Expected duplicate method error")
+		t.Fatal("want duplicate method error")
 	}
-	t.Logf("Dup method error: %v", err)
+	t.Logf("dup method error: %v", err)
 }
 
 func TestDuplicateHTTPMethodPath(t *testing.T) {
@@ -362,20 +361,20 @@ func TestDuplicateHTTPMethodPath(t *testing.T) {
 	server := NewServer("")
 	s, err := server.RegisterService(dummy, "Dummy", "v1", "A service", true)
 	if err != nil {
-		t.Fatalf("Error registering service: %s", err)
+		t.Fatalf("error registering service: %s", err)
 	}
 
 	info := s.MethodByName("GetSub").Info()
-	info.HttpMethod, info.Path = "GET", "some/{param}/path"
+	info.HTTPMethod, info.Path = "GET", "some/{param}/path"
 	info = s.MethodByName("GetList").Info()
-	info.HttpMethod, info.Path = "GET", "some/{param}/path"
+	info.HTTPMethod, info.Path = "GET", "some/{param}/path"
 
-	d := &ApiDescriptor{}
-	err = s.ApiDescriptor(d, "testhost:1234")
+	d := &APIDescriptor{}
+	err = s.APIDescriptor(d, "testhost:1234")
 	if err == nil {
-		t.Fatal("Expected duplicate HTTP method + path error")
+		t.Fatal("want duplicate HTTP method + path error")
 	}
-	t.Logf("Dup method error: %v", err)
+	t.Logf("dup method error: %v", err)
 }
 
 func TestPrefixedSchemaName(t *testing.T) {
@@ -389,23 +388,23 @@ func TestPrefixedSchemaName(t *testing.T) {
 	}
 
 	d := createDescriptor(t)
-	for name, _ := range d.Descriptor.Schemas {
+	for name := range d.Descriptor.Schemas {
 		if !strings.HasPrefix(name, pkgpath) {
-			t.Errorf("expected %q to be prefixed by %q", name, pkgpath)
+			t.Errorf("HasPrefix(%q, %q) = false", name, pkgpath)
 		}
 	}
 
 	for mname, meth := range d.Descriptor.Methods {
 		if meth.Request != nil {
 			if !strings.HasPrefix(meth.Request.Ref, pkgpath) {
-				t.Errorf("expected request schema %q of %q to be prefixed by %q",
-					meth.Request.Ref, mname, pkgpath)
+				t.Errorf("HasPrefix(%q, %q) = false; request of %q",
+					meth.Request.Ref, pkgpath, mname)
 			}
 		}
 		if meth.Response != nil {
 			if !strings.HasPrefix(meth.Response.Ref, pkgpath) {
-				t.Errorf("expected response schema %q of %q to be prefixed by %q",
-					meth.Response.Ref, mname, pkgpath)
+				t.Errorf("HasPrefix(%q, %q) = false; response of %q",
+					meth.Response.Ref, pkgpath, mname)
 			}
 		}
 	}
@@ -414,16 +413,16 @@ func TestPrefixedSchemaName(t *testing.T) {
 // ---------------------------------------------------------------------------
 // $SCHEMA_DESCRIPTOR (SCHEMAS)
 
-func verifySchema(t *testing.T, schemaId string, schemaProps [][]interface{}) {
+func verifySchema(t *testing.T, schemaID string, schemaProps [][]interface{}) {
 	d := createDescriptor(t)
-	s := d.Descriptor.Schemas[schemaId]
+	s := d.Descriptor.Schemas[schemaID]
 	if s == nil {
-		fail(t, "Expected to find %q schema, got nil", schemaId)
+		t.Errorf("want %q schema", schemaID)
 		return
 	}
 
-	verifyTT(t,
-		s.Id, schemaId,
+	verifyPairs(t,
+		s.ID, schemaID,
 		s.Type, "object",
 		s.Desc, "")
 
@@ -431,10 +430,10 @@ func verifySchema(t *testing.T, schemaId string, schemaProps [][]interface{}) {
 		name := tt[0].(string)
 		p := s.Properties[name]
 		if p == nil {
-			fail(t, "Couldn't find property %q in %#v", name, s.Properties)
+			t.Errorf("want %q in %#v", name, s.Properties)
 			continue
 		}
-		verifyTT(t,
+		verifyPairs(t,
 			p.Type, tt[1],
 			p.Format, tt[2],
 			p.Required, tt[3],
@@ -443,9 +442,9 @@ func verifySchema(t *testing.T, schemaId string, schemaProps [][]interface{}) {
 			p.Desc, tt[6],
 		)
 		if len(tt) == 7 && p.Items != nil {
-			t.Errorf("Expected %s.Items of %s to be nil", name, s.Id)
+			t.Errorf("want %s.Items of %s to be nil", name, s.ID)
 		} else if len(tt) == 13 {
-			verifyTT(t,
+			verifyPairs(t,
 				p.Items.Type, tt[7],
 				p.Items.Format, tt[8],
 				p.Items.Required, tt[9],
@@ -457,7 +456,7 @@ func verifySchema(t *testing.T, schemaId string, schemaProps [][]interface{}) {
 	}
 
 	if lp, ltts := len(s.Properties), len(schemaProps); lp != ltts {
-		fail(t, "Expected %d props in %q, got %d", ltts, s.Id, lp)
+		t.Errorf("have %d props in %q; want %d", lp, s.ID, ltts)
 	}
 }
 
@@ -525,32 +524,32 @@ func TestDescriptorMethods(t *testing.T) {
 	for _, tt := range tts {
 		meth := d.Descriptor.Methods[tt.name]
 		if meth == nil {
-			t.Errorf("Couldn't find %q method descriptor", tt.name)
+			t.Errorf("want %q method descriptor", tt.name)
 			continue
 		}
 
 		switch {
 		case tt.in == "":
 			if meth.Request != nil {
-				t.Errorf("%s: Expected req to be nil, got %#v",
+				t.Errorf("%s: have req %#v; want nil",
 					tt.name, meth.Request)
 			}
 		case tt.in != "":
 			if meth.Request == nil || meth.Request.Ref != tt.in {
-				t.Errorf("%s: Expected req to be %q, got %#v",
-					tt.name, tt.in, meth.Request)
+				t.Errorf("%s: have req %#v; want %q",
+					tt.name, meth.Request, tt.in)
 			}
 		}
 		switch {
 		case tt.out == "":
 			if meth.Response != nil {
-				t.Errorf("%s: Expected req to be nil, got %#v",
+				t.Errorf("%s: have req %#v; want nil",
 					tt.name, meth.Response)
 			}
 		case tt.out != "":
 			if meth.Response == nil || meth.Response.Ref != tt.out {
-				t.Errorf("%s: Expected req to be %q, got %#v",
-					tt.name, tt.out, meth.Response)
+				t.Errorf("%s: have resp %#v; want %q",
+					tt.name, meth.Response, tt.out)
 			}
 		}
 	}
@@ -575,13 +574,13 @@ func TestFieldNamesSimple(t *testing.T) {
 		field, exists := m[k]
 		switch {
 		case !exists:
-			t.Errorf("Couldn't find %q in %#v", k, m)
+			t.Errorf("want %q in %#v", k, m)
 		case field == nil:
-			t.Errorf("Expected non-nil field %q", k)
+			t.Errorf("want non-nil field %q", k)
 		}
 	}
 	if len(m) != len(names) {
-		t.Errorf("Expected %d elements, got %d", len(names), len(m))
+		t.Errorf("have %d elements; want %d", len(m), len(names))
 	}
 }
 
@@ -608,11 +607,11 @@ func TestFieldNamesNested(t *testing.T) {
 		m := fieldNames(reflect.TypeOf(s), tt.flatten)
 		for _, k := range tt.names {
 			if _, exists := m[k]; !exists {
-				t.Errorf("Couldn't find %q in %#v", k, m)
+				t.Errorf("want %q in %#v", k, m)
 			}
 		}
 		if len(m) != len(tt.names) {
-			t.Errorf("Expected %d items in %#v, got %d", len(tt.names), m, len(m))
+			t.Errorf("have %d items in %#v; want %d", len(m), m, len(tt.names))
 		}
 	}
 }
@@ -629,19 +628,19 @@ func TestFieldNamesAnonymous(t *testing.T) {
 	m := fieldNames(reflect.TypeOf(outer), false)
 
 	if len(m) != 2 {
-		t.Fatalf("Have %d fields, want 2", len(m))
+		t.Fatalf("have %d fields; want 2", len(m))
 	}
 
 	if _, ok := m["Root"]; !ok {
-		t.Errorf("Wanted field named Root")
+		t.Errorf("want 'Root' field")
 	}
 
 	f, ok := m["Msg"]
 	if !ok {
-		t.Fatal("Wanted a field named Msg from the Inner struct")
+		t.Fatal("want 'Msg' field from 'Inner'")
 	}
 	if f.Type.Kind() != reflect.String {
-		t.Errorf("Have Msg kind %v, want %v", f.Type.Kind(), reflect.String)
+		t.Errorf("have 'Msg' kind = %v; want %v", f.Type.Kind(), reflect.String)
 	}
 }
 
@@ -649,15 +648,19 @@ func TestFieldNamesAnonymous(t *testing.T) {
 // Parse tests
 
 func TestParsePath(t *testing.T) {
-	params, _ := parsePath("one/{a}/two/{b}/three/{c.d}")
-	assertEquals(t, 0, params, []string{"a", "b", "c.d"})
+	const in = "one/{a}/two/{b}/three/{c.d}"
+	out, _ := parsePath(in)
+	want := []string{"a", "b", "c.d"}
+	if !reflect.DeepEqual(out, want) {
+		t.Errorf("parsePath(%v) = %v; want %v", in, out, want)
+	}
 }
 
 func TestParseValue(t *testing.T) {
 	tts := []struct {
 		kind        reflect.Kind
 		val         string
-		expected    interface{}
+		want        interface{}
 		shouldError bool
 	}{
 		{reflect.Int, "123", 123, false},
@@ -683,13 +686,13 @@ func TestParseValue(t *testing.T) {
 	for i, tt := range tts {
 		out, err := parseValue(tt.val, tt.kind)
 		switch {
-		case err == nil && !tt.shouldError && out != tt.expected:
-			t.Errorf("%d: expected %v (%T) got %v (%T) while parsing %q",
-				i, tt.expected, tt.expected, out, out, tt.val)
+		case err == nil && !tt.shouldError && out != tt.want:
+			t.Errorf("%d: parseValue(%q) = %v (%T); want %v (%T)",
+				i, tt.val, out, out, tt.want, tt.want)
 		case err == nil && tt.shouldError:
-			t.Errorf("%d: expected error, got %#v", i, out)
+			t.Errorf("%d: parseValue(%q) = %#v; want error", i, tt.val, out)
 		case err != nil && !tt.shouldError:
-			t.Errorf("%d: error parsing %q: %s", i, tt.val, err)
+			t.Errorf("%d: parseValue(%q) = %v", i, tt.val, err)
 		}
 	}
 }
@@ -713,17 +716,17 @@ func TestParseTag(t *testing.T) {
 	}
 
 	typ := reflect.TypeOf(s{})
-	for _, tf := range testFields {
+	for i, tf := range testFields {
 		field, _ := typ.FieldByName(tf.name)
 		parsed, err := parseTag(field.Tag)
 		switch {
 		case err != nil && tf.tag != nil:
-			t.Errorf("Error parsing %q field tag (%s)", tf.name, field.Tag)
+			t.Errorf("%d: parseTag(%q) = %v; want %v", i, field.Tag, err, tf.tag)
 		case err == nil && tf.tag != nil && !reflect.DeepEqual(parsed, tf.tag):
-			t.Errorf("%q field: expected %#+v to equal %#+v (%s)",
-				tf.name, tf.tag, parsed, field.Tag)
+			t.Errorf("%d: parseTag(%q) = %#+v; want %#+v",
+				i, field.Tag, parsed, tf.tag)
 		case err == nil && tf.tag == nil:
-			t.Errorf("%q field: expected error, got %#v", tf.name, parsed)
+			t.Errorf("%d: parseTag(%q) = %#v; want error", i, field.Tag, parsed)
 		}
 	}
 }

@@ -26,8 +26,8 @@ var (
 // service
 // ----------------------------------------------------------------------------
 
-// RpcService represents a service registered with a specific Server.
-type RpcService struct {
+// RPCService represents a service registered with a specific Server.
+type RPCService struct {
 	name     string                    // name of service
 	rcvr     reflect.Value             // receiver of methods for the service
 	rcvrType reflect.Type              // type of the receiver
@@ -39,17 +39,17 @@ type RpcService struct {
 
 // Name returns service method name
 // TODO: remove or use info.Name here?
-func (s *RpcService) Name() string {
+func (s *RPCService) Name() string {
 	return s.name
 }
 
 // Info returns a ServiceInfo which is used to construct Endpoints API config
-func (s *RpcService) Info() *ServiceInfo {
+func (s *RPCService) Info() *ServiceInfo {
 	return s.info
 }
 
 // Methods returns a slice of all service's registered methods
-func (s *RpcService) Methods() []*ServiceMethod {
+func (s *RPCService) Methods() []*ServiceMethod {
 	items := make([]*ServiceMethod, 0, len(s.methods))
 	for _, m := range s.methods {
 		items = append(items, m)
@@ -58,7 +58,7 @@ func (s *RpcService) Methods() []*ServiceMethod {
 }
 
 // MethodByName returns a ServiceMethod of a registered service's method or nil.
-func (s *RpcService) MethodByName(name string) *ServiceMethod {
+func (s *RPCService) MethodByName(name string) *ServiceMethod {
 	return s.methods[name]
 }
 
@@ -92,7 +92,7 @@ type MethodInfo struct {
 	// name can also contain resource, e.g. "greets.list"
 	Name       string
 	Path       string
-	HttpMethod string
+	HTTPMethod string
 	Scopes     []string
 	Audiences  []string
 	ClientIds  []string
@@ -106,7 +106,7 @@ type MethodInfo struct {
 // serviceMap is a registry for services.
 type serviceMap struct {
 	mutex    sync.Mutex
-	services map[string]*RpcService
+	services map[string]*RPCService
 }
 
 // register adds a new service using reflection to extract its methods.
@@ -114,10 +114,10 @@ type serviceMap struct {
 // internal == true indicase that this is an internal service,
 // e.g. BackendService
 func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault, internal bool) (
-	*RpcService, error) {
+	*RPCService, error) {
 
 	// Setup service.
-	s := &RpcService{
+	s := &RPCService{
 		rcvr:     reflect.ValueOf(srv),
 		rcvrType: reflect.TypeOf(srv),
 		methods:  make(map[string]*ServiceMethod),
@@ -162,7 +162,7 @@ func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if m.services == nil {
-		m.services = make(map[string]*RpcService)
+		m.services = make(map[string]*RPCService)
 	} else if _, ok := m.services[s.name]; ok {
 		return nil, fmt.Errorf("endpoints: service already defined: %q", s.name)
 	}
@@ -217,9 +217,9 @@ func newServiceMethod(m *reflect.Method, internal bool) *ServiceMethod {
 		if method.ReqType.Kind() == reflect.Struct {
 			switch {
 			default:
-				method.info.HttpMethod = "POST"
+				method.info.HTTPMethod = "POST"
 			case numParam == method.ReqType.NumField():
-				method.info.HttpMethod = "GET"
+				method.info.HTTPMethod = "GET"
 			}
 		}
 		if numParam == 0 {
@@ -257,7 +257,7 @@ func requiredParamNames(t reflect.Type) []string {
 // get returns a registered service given a method name.
 //
 // The method name uses a dotted notation as in "Service.Method".
-func (m *serviceMap) get(method string) (*RpcService, *ServiceMethod, error) {
+func (m *serviceMap) get(method string) (*RPCService, *ServiceMethod, error) {
 	parts := strings.Split(method, ".")
 	if len(parts) != 2 {
 		err := fmt.Errorf("endpoints: service/method request ill-formed: %q", method)
@@ -283,7 +283,7 @@ func (m *serviceMap) get(method string) (*RpcService, *ServiceMethod, error) {
 
 // serviceByName returns a registered service or nil if there's no service
 // registered by that name.
-func (m *serviceMap) serviceByName(serviceName string) *RpcService {
+func (m *serviceMap) serviceByName(serviceName string) *RPCService {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	return m.services[serviceName]

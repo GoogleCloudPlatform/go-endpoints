@@ -1,5 +1,5 @@
 /*
-This package will let you write Cloud Endpoints backend in Go.
+Package endpoints will let you write Cloud Endpoints backend in Go.
 
 Usage
 
@@ -71,10 +71,10 @@ and leverage all the juicy stuff Cloud Endpoints are great at.
 	  }
 
 	  info := api.MethodByName("List").Info()
-	  info.Name, info.HttpMethod, info.Path, info.Desc =
+	  info.Name, info.HTTPMethod, info.Path, info.Desc =
 	    "greets.list", "GET", "greetings", "List most recent greetings."
 
-	  endpoints.HandleHttp()
+	  endpoints.HandleHTTP()
 	}
 
 

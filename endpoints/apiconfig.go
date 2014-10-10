@@ -11,11 +11,11 @@ import (
 	"time"
 )
 
-// curlyBrackets is used for generating the key for dups map in ApiDescriptor().
+// curlyBrackets is used for generating the key for dups map in APIDescriptor().
 var curlyBrackets = regexp.MustCompile("{.+}")
 
-// ApiDescriptor is the top-level struct for a single Endpoints API config.
-type ApiDescriptor struct {
+// APIDescriptor is the top-level struct for a single Endpoints API config.
+type APIDescriptor struct {
 	// Required
 	Extends  string `json:"extends"`
 	Root     string `json:"root"`
@@ -36,22 +36,22 @@ type ApiDescriptor struct {
 	} `json:"auth,omitempty"`
 
 	// $METHOD_MAP
-	Methods map[string]*ApiMethod `json:"methods"`
+	Methods map[string]*APIMethod `json:"methods"`
 
 	// $SCHEMA_DESCRIPTOR
 	Descriptor struct {
-		Methods map[string]*ApiMethodDescriptor `json:"methods"`
-		Schemas map[string]*ApiSchemaDescriptor `json:"schemas"`
+		Methods map[string]*APIMethodDescriptor `json:"methods"`
+		Schemas map[string]*APISchemaDescriptor `json:"schemas"`
 	} `json:"descriptor"`
 }
 
-// ApiMethod is an item of $METHOD_MAP
-type ApiMethod struct {
+// APIMethod is an item of $METHOD_MAP
+type APIMethod struct {
 	Path       string               `json:"path"`
-	HttpMethod string               `json:"httpMethod"`
+	HTTPMethod string               `json:"httpMethod"`
 	RosyMethod string               `json:"rosyMethod"`
-	Request    ApiReqRespDescriptor `json:"request"`
-	Response   ApiReqRespDescriptor `json:"response"`
+	Request    APIReqRespDescriptor `json:"request"`
+	Response   APIReqRespDescriptor `json:"response"`
 
 	Scopes    []string `json:"scopes,omitempty"`
 	Audiences []string `json:"audiences,omitempty"`
@@ -59,57 +59,60 @@ type ApiMethod struct {
 	Desc      string   `json:"description,omitempty"`
 }
 
-// ApiReqRespDescriptor indicates type of request data expected to be found
+// APIReqRespDescriptor indicates type of request data expected to be found
 // in a request or a response.
-type ApiReqRespDescriptor struct {
+type APIReqRespDescriptor struct {
 	Body     string                          `json:"body"`
 	BodyName string                          `json:"bodyName,omitempty"`
-	Params   map[string]*ApiRequestParamSpec `json:"parameters,omitempty"`
+	Params   map[string]*APIRequestParamSpec `json:"parameters,omitempty"`
 }
 
-// ApiRequestParamSpec is a description of all the expected request parameters.
-type ApiRequestParamSpec struct {
+// APIRequestParamSpec is a description of all the expected request parameters.
+type APIRequestParamSpec struct {
 	Type     string                       `json:"type"`
 	Required bool                         `json:"required,omitempty"`
 	Default  interface{}                  `json:"default,omitempty"`
 	Repeated bool                         `json:"repeated,omitempty"`
-	Enum     map[string]*ApiEnumParamSpec `json:"enum,omitempty"`
+	Enum     map[string]*APIEnumParamSpec `json:"enum,omitempty"`
 	// only for int32/int64/uint32/uint64
 	Min interface{} `json:"minValue,omitempty"`
 	Max interface{} `json:"maxValue,omitempty"`
 }
 
-type ApiEnumParamSpec struct {
+// APIEnumParamSpec is the enum type of request/response param spec.
+// Not used currently.
+type APIEnumParamSpec struct {
 	BackendVal string `json:"backendValue"`
 	Desc       string `json:"description,omitempty"`
 	// TODO: add 'number' field?
 }
 
-// ApiMethodDescriptor item of Descriptor.Methods map ($SCHEMA_DESCRIPTOR).
-type ApiMethodDescriptor struct {
-	Request  *ApiSchemaRef `json:"request,omitempty"`
-	Response *ApiSchemaRef `json:"response,omitempty"`
-	// Original method of an RpcService
+// APIMethodDescriptor item of Descriptor.Methods map ($SCHEMA_DESCRIPTOR).
+type APIMethodDescriptor struct {
+	Request  *APISchemaRef `json:"request,omitempty"`
+	Response *APISchemaRef `json:"response,omitempty"`
+	// Original method of an RPCService
 	serviceMethod *ServiceMethod
 }
 
-type ApiSchemaRef struct {
+// APISchemaRef is used when referencing a schema from a method or array elem.
+type APISchemaRef struct {
 	Ref string `json:"$ref"`
 }
 
-// ApiSchemaDescriptor item of Descriptor.Schemas map ($SCHEMA_DESCRIPTOR)
-type ApiSchemaDescriptor struct {
-	Id         string                        `json:"id"`
+// APISchemaDescriptor item of Descriptor.Schemas map ($SCHEMA_DESCRIPTOR)
+type APISchemaDescriptor struct {
+	ID         string                        `json:"id"`
 	Type       string                        `json:"type"`
-	Properties map[string]*ApiSchemaProperty `json:"properties"`
+	Properties map[string]*APISchemaProperty `json:"properties"`
 	Desc       string                        `json:"description,omitempty"`
 }
 
-// ApiSchemaProperty is an item of ApiSchemaDescriptor.Properties map
-type ApiSchemaProperty struct {
+// APISchemaProperty is an item of APISchemaDescriptor.Properties map
+type APISchemaProperty struct {
 	Type   string             `json:"type,omitempty"`
 	Format string             `json:"format,omitempty"`
-	Items  *ApiSchemaProperty `json:"items,omitempty"`
+	Items  *APISchemaProperty `json:"items,omitempty"`
 
 	Required bool        `json:"required,omitempty"`
 	Default  interface{} `json:"default,omitempty"`
@@ -118,18 +121,18 @@ type ApiSchemaProperty struct {
 	Desc string `json:"description,omitempty"`
 }
 
-// ApiDescriptor populates provided ApiDescriptor with all info needed to
+// APIDescriptor populates provided APIDescriptor with all info needed to
 // generate a discovery doc from its receiver.
 //
 // Args:
-//   - dst, a non-nil pointer to ApiDescriptor struct
+//   - dst, a non-nil pointer to APIDescriptor struct
 //   - host, a hostname used for discovery API config Root and BNS.
 //
 // Returns error if malformed params were encountered
 // (e.g. ServerMethod.Path, etc.)
-func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
+func (s *RPCService) APIDescriptor(dst *APIDescriptor, host string) error {
 	if dst == nil {
-		return errors.New("Destination ApiDescriptor is nil")
+		return errors.New("Destination APIDescriptor is nil")
 	}
 	if host == "" {
 		return errors.New("Empty host parameter")
@@ -149,36 +152,36 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 	methods := s.Methods()
 	numMethods := len(methods)
 
-	dst.Methods = make(map[string]*ApiMethod, numMethods)
-	dst.Descriptor.Methods = make(map[string]*ApiMethodDescriptor, numMethods)
+	dst.Methods = make(map[string]*APIMethod, numMethods)
+	dst.Descriptor.Methods = make(map[string]*APIMethodDescriptor, numMethods)
 	// Sanity check for duplicate HTTP method + path
 	dups := make(map[string]string, numMethods)
 
 	for _, m := range methods {
 		info := m.Info()
-		dupName := info.HttpMethod + curlyBrackets.ReplaceAllLiteralString(info.Path, "{}")
+		dupName := info.HTTPMethod + curlyBrackets.ReplaceAllLiteralString(info.Path, "{}")
 		if mname, ok := dups[dupName]; ok {
 			return fmt.Errorf(`"%s %s" is already registered with %s`,
-				info.HttpMethod, info.Path, mname)
+				info.HTTPMethod, info.Path, mname)
 		}
 		dups[dupName] = dst.Name + "." + info.Name
 
 		// Methods of $SCHEMA_DESCRIPTOR
-		mdescr := &ApiMethodDescriptor{serviceMethod: m}
+		mdescr := &APIMethodDescriptor{serviceMethod: m}
 		dst.Descriptor.Methods[s.Name()+"."+m.method.Name] = mdescr
 		if !info.isBodiless() && !isEmptyStruct(m.ReqType) {
-			refId := schemaNameForType(m.ReqType)
-			mdescr.Request = &ApiSchemaRef{Ref: refId}
-			schemasToCreate[refId] = m.ReqType
+			refID := schemaNameForType(m.ReqType)
+			mdescr.Request = &APISchemaRef{Ref: refID}
+			schemasToCreate[refID] = m.ReqType
 		}
 		if !isEmptyStruct(m.RespType) {
-			refId := schemaNameForType(m.RespType)
-			mdescr.Response = &ApiSchemaRef{Ref: refId}
-			schemasToCreate[refId] = m.RespType
+			refID := schemaNameForType(m.RespType)
+			mdescr.Response = &APISchemaRef{Ref: refID}
+			schemasToCreate[refID] = m.RespType
 		}
 
 		// $METHOD_MAP
-		apimeth, err := mdescr.toApiMethod(s.Name())
+		apimeth, err := mdescr.toAPIMethod(s.Name())
 		if err != nil {
 			return err
 		}
@@ -191,7 +194,7 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 
 	// Schemas of $SCHEMA_DESCRIPTOR
 	dst.Descriptor.Schemas = make(
-		map[string]*ApiSchemaDescriptor, len(schemasToCreate))
+		map[string]*APISchemaDescriptor, len(schemasToCreate))
 	for ref, t := range schemasToCreate {
 		if err := addSchemaFromType(dst.Descriptor.Schemas, ref, t); err != nil {
 			return err
@@ -200,16 +203,16 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 	return nil
 }
 
-// toApiMethod creates a new ApiMethod using its receiver info and provided
+// toAPIMethod creates a new APIMethod using its receiver info and provided
 // rosy service name.
 //
 // Args:
 //   - rosySrv, original name of a service, e.g. "MyService"
-func (md *ApiMethodDescriptor) toApiMethod(rosySrv string) (*ApiMethod, error) {
+func (md *APIMethodDescriptor) toAPIMethod(rosySrv string) (*APIMethod, error) {
 	info := md.serviceMethod.Info()
-	apim := &ApiMethod{
+	apim := &APIMethod{
 		Path:       info.Path,
-		HttpMethod: info.HttpMethod,
+		HTTPMethod: info.HTTPMethod,
 		RosyMethod: rosySrv + "." + md.serviceMethod.method.Name,
 		Scopes:     info.Scopes,
 		Audiences:  info.Audiences,
@@ -228,20 +231,20 @@ func (md *ApiMethodDescriptor) toApiMethod(rosySrv string) (*ApiMethod, error) {
 		return nil, err
 	}
 
-	setApiReqRespBody(&apim.Request, "backendRequest", md.Request == nil)
-	setApiReqRespBody(&apim.Response, "backendResponse", md.Response == nil)
+	setAPIReqRespBody(&apim.Request, "backendRequest", md.Request == nil)
+	setAPIReqRespBody(&apim.Response, "backendResponse", md.Response == nil)
 	return apim, nil
 }
 
-// addSchemaFromType creates a new ApiSchemaDescriptor from given Type t
+// addSchemaFromType creates a new APISchemaDescriptor from given Type t
 // and adds it to the map with the key of provided ref arg.
 //
-// Returns an error if ApiSchemaDescriptor cannot be created from this Type.
-func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, ref string, t reflect.Type) error {
+// Returns an error if APISchemaDescriptor cannot be created from this Type.
+func addSchemaFromType(dst map[string]*APISchemaDescriptor, ref string, t reflect.Type) error {
 	if ref == "" {
 		ref = t.Name()
 	}
-	if t.Name() == "" {
+	if ref == "" {
 		return fmt.Errorf("Creating schema from unnamed type is currently not supported: %v", t)
 	}
 	if _, exists := dst[ref]; exists {
@@ -249,7 +252,7 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, ref string, t reflec
 	}
 
 	ensureSchemas := make(map[string]reflect.Type)
-	sd := &ApiSchemaDescriptor{Id: ref}
+	sd := &APISchemaDescriptor{ID: ref}
 
 	switch t.Kind() {
 	// case reflect.Array:
@@ -257,18 +260,18 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, ref string, t reflec
 	// 	sd.Items... ?
 	case reflect.Struct:
 		fieldsMap := fieldNames(t, false)
-		sd.Properties = make(map[string]*ApiSchemaProperty, len(fieldsMap))
+		sd.Properties = make(map[string]*APISchemaProperty, len(fieldsMap))
 		sd.Type = "object"
 		for name, field := range fieldsMap {
 			fkind := field.Type.Kind()
-			prop := &ApiSchemaProperty{}
+			prop := &APISchemaProperty{}
 
 			// TODO(alex): add support for reflect.Map?
 			switch {
 			default:
 				prop.Type, prop.Format = typeToPropFormat(field.Type)
 
-			case implements(field.Type, typeOfJsonMarshaler):
+			case implements(field.Type, typeOfJSONMarshaler):
 				prop.Type = "string"
 
 			case fkind == reflect.Ptr, fkind == reflect.Struct:
@@ -287,7 +290,7 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, ref string, t reflec
 					default:
 						return fmt.Errorf(
 							"Unsupported type %#v of property %s.%s",
-							field.Type, sd.Id, name)
+							field.Type, sd.ID, name)
 					}
 				}
 
@@ -297,7 +300,7 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, ref string, t reflec
 					break
 				}
 				prop.Type = "array"
-				prop.Items = &ApiSchemaProperty{}
+				prop.Items = &APISchemaProperty{}
 				el := field.Type.Elem()
 				if el.Kind() == reflect.Ptr {
 					el = el.Elem()
@@ -338,14 +341,14 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, ref string, t reflec
 	return nil
 }
 
-// setApiReqRespBody populates ApiReqRespDescriptor with correct values based
+// setAPIReqRespBody populates APIReqRespDescriptor with correct values based
 // on provided arguments.
 //
 // Args:
-//   - d, a non-nil pointer of ApiReqRespDescriptor to populate
+//   - d, a non-nil pointer of APIReqRespDescriptor to populate
 //   - template, either "backendRequest" or "backendResponse"
 //   - empty, true if the origial method does not have a request/response body.
-func setApiReqRespBody(d *ApiReqRespDescriptor, template string, empty bool) {
+func setAPIReqRespBody(d *APIReqRespDescriptor, template string, empty bool) {
 	if empty {
 		d.Body = "empty"
 	} else {
@@ -357,7 +360,7 @@ func setApiReqRespBody(d *ApiReqRespDescriptor, template string, empty bool) {
 // isBodiless returns true of this is either GET or DELETE
 func (info *MethodInfo) isBodiless() bool {
 	// "OPTIONS" method is not supported anyway.
-	return info.HttpMethod == "GET" || info.HttpMethod == "DELETE"
+	return info.HTTPMethod == "GET" || info.HTTPMethod == "DELETE"
 }
 
 // ---------------------------------------------------------------------------
@@ -375,7 +378,7 @@ type jsonMarshaler interface {
 var (
 	typeOfTime          = reflect.TypeOf(time.Time{})
 	typeOfBytes         = reflect.TypeOf([]byte(nil))
-	typeOfJsonMarshaler = reflect.TypeOf((*jsonMarshaler)(nil)).Elem()
+	typeOfJSONMarshaler = reflect.TypeOf((*jsonMarshaler)(nil)).Elem()
 
 	// SchemaNameForType returns a name for the given schema type,
 	// used to reference schema definitions in the API descriptor.
@@ -450,20 +453,20 @@ func typeToPropFormat(t reflect.Type) (string, string) {
 	return "", ""
 }
 
-// typeToParamsSpec creates a new ApiRequestParamSpec map from a Type for all
+// typeToParamsSpec creates a new APIRequestParamSpec map from a Type for all
 // fields in t.
 //
 // Normally, t is a Struct type and it's what an original service method
 // expects as input (request arg).
 func typeToParamsSpec(t reflect.Type) (
-	map[string]*ApiRequestParamSpec, error) {
+	map[string]*APIRequestParamSpec, error) {
 
 	if t.Kind() != reflect.Struct {
 		return nil, fmt.Errorf(
 			"typeToParamsSpec: Only structs are supported, got: %v", t)
 	}
 
-	params := make(map[string]*ApiRequestParamSpec)
+	params := make(map[string]*APIRequestParamSpec)
 
 	for name, field := range fieldNames(t, true) {
 		param, err := fieldToParamSpec(field)
@@ -481,7 +484,7 @@ func typeToParamsSpec(t reflect.Type) (
 //
 // path template is is something like "some/{a}/path/{b}".
 func typeToParamsSpecFromPath(t reflect.Type, path string) (
-	map[string]*ApiRequestParamSpec, error) {
+	map[string]*APIRequestParamSpec, error) {
 
 	if t.Kind() != reflect.Struct {
 		return nil, fmt.Errorf(
@@ -494,7 +497,7 @@ func typeToParamsSpecFromPath(t reflect.Type, path string) (
 	}
 
 	fieldsMap := fieldNames(t, true)
-	params := make(map[string]*ApiRequestParamSpec)
+	params := make(map[string]*APIRequestParamSpec)
 
 	for _, k := range pathKeys {
 		field, found := fieldsMap[k]
@@ -514,12 +517,12 @@ func typeToParamsSpecFromPath(t reflect.Type, path string) (
 	return params, nil
 }
 
-// fieldToParamSpec creates a ApiRequestParamSpec from the given StructField.
+// fieldToParamSpec creates a APIRequestParamSpec from the given StructField.
 // It returns error if the field's kind/type is not supported.
 //
 // See parseTag() method for supported tag options.
-func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err error) {
-	p = &ApiRequestParamSpec{}
+func fieldToParamSpec(field *reflect.StructField) (p *APIRequestParamSpec, err error) {
+	p = &APIRequestParamSpec{}
 	kind := field.Type.Kind()
 	if kind == reflect.Ptr {
 		kind = indirectType(field.Type).Kind()
@@ -542,7 +545,7 @@ func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err e
 		p.Type = "boolean"
 	case field.Type == typeOfBytes:
 		p.Type = "bytes"
-	case kind == reflect.String, implements(field.Type, typeOfJsonMarshaler):
+	case kind == reflect.String, implements(field.Type, typeOfJSONMarshaler):
 		p.Type = "string"
 	default:
 		return nil, fmt.Errorf("Unsupported field: %#v", field)
@@ -603,7 +606,7 @@ func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
 		}
 
 		if flatten && indirectKind(f.Type) == reflect.Struct &&
-			!implements(f.Type, typeOfJsonMarshaler) {
+			!implements(f.Type, typeOfJSONMarshaler) {
 
 			for nname, nfield := range fieldNames(indirectType(f.Type), true) {
 				m[name+"."+nname] = nfield
@@ -689,7 +692,7 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 //
 // For instance, parsePath("one/{a}/two/{b}") will return []string{"a","b"}.
 func parsePath(path string) ([]string, error) {
-	params := make([]string, 0)
+	var params []string
 	for {
 		i := strings.IndexRune(path, '{')
 		if i < 0 {
@@ -718,19 +721,19 @@ func parseValue(s string, k reflect.Kind) (interface{}, error) {
 	case k == reflect.Int64:
 		return strconv.ParseInt(s, 0, 64)
 	case reflect.Uint <= k && k <= reflect.Uint32:
-		if v, err := strconv.ParseUint(s, 0, 32); err == nil {
-			return uint32(v), nil
-		} else {
+		v, err := strconv.ParseUint(s, 0, 32)
+		if err != nil {
 			return nil, err
 		}
+		return uint32(v), nil
 	case k == reflect.Uint64:
 		return strconv.ParseUint(s, 0, 64)
 	case k == reflect.Float32:
-		if v, err := strconv.ParseFloat(s, 32); err == nil {
-			return float32(v), nil
-		} else {
+		v, err := strconv.ParseFloat(s, 32)
+		if err != nil {
 			return nil, err
 		}
+		return float32(v), nil
 	case k == reflect.Float64:
 		return strconv.ParseFloat(s, 64)
 	case k == reflect.Bool:
