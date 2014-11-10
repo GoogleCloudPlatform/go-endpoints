@@ -72,12 +72,21 @@ func getOAuthResponse(c *cachingContext, scope string) (*pb.GetOAuthUserResponse
 	return res, nil
 }
 
-// HttpRequest returns the request associated with this context.
-func (c *cachingContext) HttpRequest() *http.Request {
+// HTTPRequest returns the request associated with this context.
+func (c *cachingContext) HTTPRequest() *http.Request {
 	return c.r
 }
 
-// CurrentOAuthClientID returns a clientId associated with the scope.
+// Namespace returns a replacement context that operates within the given namespace.
+func (c *cachingContext) Namespace(name string) (Context, error) {
+	nc, err := appengine.Namespace(c, name)
+	if err != nil {
+		return nil, err
+	}
+	return newCachingContext(nc, c.r), nil
+}
+
+// CurrentOAuthClientID returns a clientID associated with the scope.
 func (c *cachingContext) CurrentOAuthClientID(scope string) (string, error) {
 	res, err := getOAuthResponse(c, scope)
 	if err != nil {
@@ -104,12 +113,15 @@ func (c *cachingContext) CurrentOAuthUser(scope string) (*user.User, error) {
 	}, nil
 }
 
+func newCachingContext(c appengine.Context, r *http.Request) Context {
+	return &cachingContext{c, r, map[string]*pb.GetOAuthUserResponse{}, sync.Mutex{}}
+}
+
 // Default implentation of endpoints.ContextFactory.
 func cachingContextFactory(r *http.Request) Context {
 	// TODO(dhermes): Check whether the prod behaviour is identical to dev.
 	// On dev appengine.NewContext() panics on error so, if it is identical
 	// then there's nothing else to do here.
 	// (was: Fail if ctx is nil.)
-	ac := appengine.NewContext(r)
-	return &cachingContext{ac, r, map[string]*pb.GetOAuthUserResponse{}, sync.Mutex{}}
+	return newCachingContext(appengine.NewContext(r), r)
 }

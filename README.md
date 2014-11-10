@@ -32,6 +32,17 @@ precisely what we want to do, "unrecognized import path" errors can be safely
 ignored.
 
 
+Alternatively, use [goapp tool][goapp] from the Google App Engine SDK for Go
+to get the package:
+
+```
+GO_APPENGINE/goapp get github.com/crhym3/go-endpoints/endpoints
+```
+
+If you'll ever need to pull updates from the upstream, execute `git pull`
+from the root of this repo.
+
+
 ## Usage
 
 Declare structs which describe your data. For instance:
@@ -105,10 +116,10 @@ func init() {
   }
 
   info := api.MethodByName("List").Info()
-  info.Name, info.HttpMethod, info.Path, info.Desc =
+  info.Name, info.HTTPMethod, info.Path, info.Desc =
     "greets.list", "GET", "greetings", "List most recent greetings."
 
-  endpoints.HandleHttp()
+  endpoints.HandleHTTP()
 }
 ```
 
@@ -230,22 +241,29 @@ Or you can just play it on the [live demo app][13].
 
 ## Running tests
 
-We currently use [aet tool][4] to simplify running tests on files that have
-"appengine" or "appengine_internal" imports.
+You'll need Google App Engine SDK for Go to run tests.
 
-Check out the readme of that tool but, assuming you cloned this repo
-(so you can reach ./endpoints dir), the initial setup process is pretty simple:
+Once you get that installed, use `goapp` tool to run all tests from the root 
+of this repo:
 
-  - `go get github.com/crhym3/aegot/aet`
-  - `aet init ./endpoints`
+```
+GO_APPENGINE_SDK/goapp test ./endpoints
+```
 
-That's it. You should be able to run tests with "aet test ./endpoints" now.
+The tool uses API server bundled with the SDK, which outputs lots of debugging
+info. You can suppress that with:
+
+```
+GO_APPENGINE_SDK/goapp test -v ./endpoints 2> /dev/null
+```
+
+[Learn more about goapp tool][goapp].
+
 
 
 [1]: https://developers.google.com/appengine/docs/python/endpoints/
 [2]: https://developers.google.com/appengine/docs/java/endpoints/
 [3]: https://github.com/crhym3/go-tictactoe
-[4]: https://github.com/crhym3/aegot
 [5]: http://localhost:8080/_ah/api/discovery/v1/apis/greeting/v1/rest
 [6]: http://localhost:8080/_ah/api/explorer
 [7]: http://appengine.appspot.com
@@ -255,3 +273,4 @@ That's it. You should be able to run tests with "aet test ./endpoints" now.
 [11]: http://godoc.org/github.com/crhym3/go-endpoints/endpoints
 [12]: https://github.com/crhym3/go-endpoints/wiki
 [13]: https://go-endpoints.appspot.com/tictactoe
+[goapp]: http://blog.golang.org/appengine-dec2013

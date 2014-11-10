@@ -2,15 +2,12 @@ package endpoints
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
+	"appengine"
 	"appengine/memcache"
-
-	mc_pb "appengine_internal/memcache"
-	"code.google.com/p/goprotobuf/proto"
-
-	tu "github.com/crhym3/aegot/testutils"
 )
 
 var jwtValidTokenObject = signedJWT{
@@ -115,34 +112,23 @@ const googCerts = `{
 	}]
 }`
 
-func stubMemcacheGetCerts() func() {
-	stub := func(in, out proto.Message, _ *tu.RpcCallOptions) error {
-		req := in.(*mc_pb.MemcacheGetRequest)
-		if req.GetNameSpace() == certNamespace &&
-			len(req.Key) == 1 && string(req.Key[0]) == DefaultCertUri {
-
-			item := &mc_pb.MemcacheGetResponse_Item{
-				Key:   req.Key[0],
-				Value: []byte(googCerts),
-			}
-			resp := out.(*mc_pb.MemcacheGetResponse)
-			resp.Item = []*mc_pb.MemcacheGetResponse_Item{item}
-			return nil
-		}
-		return memcache.ErrCacheMiss
+func TestverifySignedJWT(t *testing.T) {
+	r, _, closer := newTestRequest(t, "GET", "/", nil)
+	defer closer()
+	nc, err := appengine.Namespace(appengine.NewContext(r), certNamespace)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return tu.RegisterAPIOverride("memcache", "Get", stub)
-}
 
-func TestVerifySignedJwt(t *testing.T) {
-	defer stubMemcacheGetCerts()()
-	r, deleteAppengineContext := tu.NewTestRequest("GET", "/", nil)
-	defer deleteAppengineContext()
+	item := &memcache.Item{Key: DefaultCertURI, Value: []byte(googCerts)}
+	if err := memcache.Set(nc, item); err != nil {
+		t.Fatal(err)
+	}
 
 	tts := []struct {
-		token    string
-		now      time.Time
-		expected *signedJWT
+		token string
+		now   time.Time
+		want  *signedJWT
 	}{
 		{jwtValidTokenString, jwtValidTokenTime, &jwtValidTokenObject},
 		{jwtValidTokenString, jwtValidTokenTime.Add(time.Hour * 24), nil},
@@ -153,17 +139,22 @@ func TestVerifySignedJwt(t *testing.T) {
 		{"another.invalid.token", jwtValidTokenTime, nil},
 	}
 
-	c := NewContext(r)
+	ec := NewContext(r)
 
 	for i, tt := range tts {
-		jwt, err := verifySignedJwt(c, tt.token, tt.now.Unix())
+		jwt, err := verifySignedJWT(ec, tt.token, tt.now.Unix())
 		switch {
-		case err != nil && tt.expected != nil:
-			t.Errorf("%d: didn't expect error: %v", i, err)
-		case err == nil && tt.expected == nil:
-			t.Errorf("%d: expected error, got: %#v", i, jwt)
-		case err == nil && tt.expected != nil:
-			assertEquals(t, i, jwt, tt.expected)
+		case err != nil && tt.want != nil:
+			t.Errorf("%d: verifySignedJWT(%q, %d) = %v; want %#v",
+				i, tt.token, tt.now.Unix(), err, tt.want)
+		case err == nil && tt.want == nil:
+			t.Errorf("%d: verifySignedJWT(%q, %d) = %#v; want error",
+				i, tt.token, tt.now.Unix(), jwt)
+		case err == nil && tt.want != nil:
+			if !reflect.DeepEqual(jwt, tt.want) {
+				t.Errorf("%d: verifySignedJWT(%q, %d) = %v; want %#v",
+					i, tt.token, tt.now.Unix(), jwt, tt.want)
+			}
 		}
 	}
 }
@@ -171,40 +162,39 @@ func TestVerifySignedJwt(t *testing.T) {
 func TestVerifyParsedToken(t *testing.T) {
 	const (
 		goog     = "accounts.google.com"
-		clientId = "my-client-id"
+		clientID = "my-client-id"
 		email    = "dude@gmail.com"
 	)
-	audiences := []string{clientId, "hello-android"}
-	clientIds := []string{clientId}
+	audiences := []string{clientID, "hello-android"}
+	clientIDs := []string{clientID}
 
 	tts := []struct {
-		issuer, audience, clientId, email string
+		issuer, audience, clientID, email string
 		valid                             bool
 	}{
-		{goog, clientId, clientId, email, true},
-		{goog, "hello-android", clientId, email, true},
-		{goog, "invalid", clientId, email, false},
-		{goog, clientId, "invalid", email, false},
-		{goog, clientId, clientId, "", false},
-		{"", clientId, clientId, email, false},
+		{goog, clientID, clientID, email, true},
+		{goog, "hello-android", clientID, email, true},
+		{goog, "invalid", clientID, email, false},
+		{goog, clientID, "invalid", email, false},
+		{goog, clientID, clientID, "", false},
+		{"", clientID, clientID, email, false},
 	}
 
-	r, deleteCtx := tu.NewTestRequest("GET", "/", nil)
-	defer deleteCtx()
-
+	r, _, closer := newTestRequest(t, "GET", "/", nil)
+	defer closer()
 	c := NewContext(r)
 
 	for i, tt := range tts {
 		jwt := signedJWT{
 			Issuer:   tt.issuer,
 			Audience: tt.audience,
-			ClientID: tt.clientId,
+			ClientID: tt.clientID,
 			Email:    tt.email,
 		}
-		out := verifyParsedToken(c, jwt, audiences, clientIds)
-		if tt.valid != out {
-			t.Errorf("%d: expected token to be valid? %v, got: %v",
-				i, tt.valid, out)
+		res := verifyParsedToken(c, jwt, audiences, clientIDs)
+		if res != tt.valid {
+			t.Errorf("%d: verifyParsedToken(%#v, %v, %v) = %v; want %v",
+				i, jwt, audiences, clientIDs, res, tt.valid)
 		}
 	}
 }
@@ -214,8 +204,9 @@ func TestCurrentIDTokenUser(t *testing.T) {
 	defer func() {
 		jwtParser = jwtOrigParser
 	}()
-	r, deleteAppengineContext := tu.NewTestRequest("GET", "/", nil)
-	defer deleteAppengineContext()
+
+	r, _, closer := newTestRequest(t, "GET", "/", nil)
+	defer closer()
 	c := NewContext(r)
 
 	aud := []string{jwtValidTokenObject.Audience, jwtValidTokenObject.ClientID}
@@ -231,8 +222,8 @@ func TestCurrentIDTokenUser(t *testing.T) {
 	}
 
 	tts := []struct {
-		token         *signedJWT
-		expectedEmail string
+		token     *signedJWT
+		wantEmail string
 	}{
 		{&jwtValidTokenObject, jwtValidTokenObject.Email},
 		{&jwtUnacceptedToken, ""},
@@ -253,12 +244,15 @@ func TestCurrentIDTokenUser(t *testing.T) {
 		user, err := currentIDTokenUser(c,
 			jwtValidTokenString, aud, azp, jwtValidTokenTime.Unix())
 		switch {
-		case tt.expectedEmail != "" && err != nil:
-			t.Errorf("%d: unexpected error: %v", i, err)
-		case tt.expectedEmail == "" && err == nil:
-			t.Errorf("%d: expected error, got: %#v", i, user)
-		case err == nil && tt.expectedEmail != user.Email:
-			t.Errorf("%d: expected %q, got %q", i, tt.expectedEmail, user.Email)
+		case tt.wantEmail != "" && err != nil:
+			t.Errorf("%d: currentIDTokenUser(%q, %v, %v, %d) = %v; want email = %q",
+				i, jwtValidTokenString, aud, azp, jwtValidTokenTime.Unix(), err, tt.wantEmail)
+		case tt.wantEmail == "" && err == nil:
+			t.Errorf("%d: currentIDTokenUser(%q, %v, %v, %d) = %#v; want error",
+				i, jwtValidTokenString, aud, azp, jwtValidTokenTime.Unix(), user)
+		case err == nil && tt.wantEmail != user.Email:
+			t.Errorf("%d: currentIDTokenUser(%q, %v, %v, %d) = %#v; want email = %q",
+				i, jwtValidTokenString, aud, azp, jwtValidTokenTime.Unix(), user, tt.wantEmail)
 		}
 	}
 }
