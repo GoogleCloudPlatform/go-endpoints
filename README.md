@@ -12,7 +12,7 @@ documentation for [Python][1] or [Java][2].
 
 ## Install
 
-Start with `go get github.com/GoogleCloudPlatform/go-endpoints`. If this is not
+Start with `go get github.com/GoogleCloudPlatform/go-endpoints/endpoints`. If this is not
 the first time you're "getting" the package, add `-u` param to get an updated
 version, i.e. `go get -u ...`.
 
