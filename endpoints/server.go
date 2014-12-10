@@ -35,6 +35,18 @@ func NewServer(root string) *Server {
 	return server
 }
 
+// Must is a helper that wraps a call to a function returning (*Template,
+// error) and panics if the error is non-nil. It is intended for use in
+// variable initializations such as:
+//
+//   var t = endpoints.Must(endpoints.RegisterServiceWithDefaults(srv))
+func Must(srv *RPCService, err error) *RPCService {
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
 // RegisterService adds a new service to the server.
 //
 // The name parameter is optional: if empty it will be inferred from
