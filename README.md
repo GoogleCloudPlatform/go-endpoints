@@ -1,5 +1,5 @@
-<a href="https://travis-ci.org/crhym3/go-endpoints" target="_blank">
-  <img align="right" src="https://api.travis-ci.org/crhym3/go-endpoints.png"
+<a href="https://travis-ci.org/GoogleCloudPlatform/go-endpoints" target="_blank">
+  <img align="right" src="https://api.travis-ci.org/GoogleCloudPlatform/go-endpoints.png"
        alt="Build Status">
 </a>
 # Cloud Endpoints for Go
@@ -12,7 +12,7 @@ documentation for [Python][1] or [Java][2].
 
 ## Install
 
-Start with `go get github.com/crhym3/go-endpoints/endpoints`. If this is not
+Start with `go get github.com/GoogleCloudPlatform/go-endpoints`. If this is not
 the first time you're "getting" the package, add `-u` param to get an updated
 version, i.e. `go get -u ...`.
 
@@ -36,7 +36,7 @@ Alternatively, use [goapp tool][goapp] from the Google App Engine SDK for Go
 to get the package:
 
 ```
-GO_APPENGINE/goapp get github.com/crhym3/go-endpoints/endpoints
+GO_APPENGINE/goapp get github.com/GoogleCloudPlatform/go-endpoints/endpoints
 ```
 
 If you'll ever need to pull updates from the upstream, execute `git pull`
@@ -105,7 +105,7 @@ Last step is to make the above available as a **discoverable API**
 and leverage all the juicy stuff Cloud Endpoints are great at.
 
 ```go
-import "github.com/crhym3/go-endpoints/endpoints"
+import "github.com/GoogleCloudPlatform/go-endpoints/endpoints"
 
 func init() {
   greetService := &GreetingService{}
@@ -270,7 +270,7 @@ GO_APPENGINE_SDK/goapp test -v ./endpoints 2> /dev/null
 [8]: https://developers.google.com/appengine/docs/python/endpoints/consume_android
 [9]: https://developers.google.com/appengine/docs/python/endpoints/consume_ios
 [10]: https://developers.google.com/appengine/docs/python/endpoints/consume_js
-[11]: http://godoc.org/github.com/crhym3/go-endpoints/endpoints
-[12]: https://github.com/crhym3/go-endpoints/wiki
+[11]: http://godoc.org/github.com/GoogleCloudPlatform/go-endpoints/endpoints
+[12]: https://github.com/GoogleCloudPlatform/go-endpoints/wiki
 [13]: https://go-endpoints.appspot.com/tictactoe
 [goapp]: http://blog.golang.org/appengine-dec2013
