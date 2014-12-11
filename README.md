@@ -12,7 +12,7 @@ documentation for [Python][1] or [Java][2].
 
 ## Install
 
-Start with `go get github.com/crhym3/go-endpoints/endpoints`. If this is not
+Start with `go get github.com/GoogleCloudPlatform/go-endpoints/endpoints`. If this is not
 the first time you're "getting" the package, add `-u` param to get an updated
 version, i.e. `go get -u ...`.
 
@@ -36,7 +36,7 @@ Alternatively, use [goapp tool][goapp] from the Google App Engine SDK for Go
 to get the package:
 
 ```
-GO_APPENGINE/goapp get github.com/crhym3/go-endpoints/endpoints
+GO_APPENGINE/goapp get github.com/GoogleCloudPlatform/go-endpoints/endpoints
 ```
 
 If you'll ever need to pull updates from the upstream, execute `git pull`
