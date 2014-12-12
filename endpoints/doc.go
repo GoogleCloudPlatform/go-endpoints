@@ -60,7 +60,7 @@ Then, a service:
 Last step is to make the above available as a discoverable API
 and leverage all the juicy stuff Cloud Endpoints are great at.
 
-	import "github.com/crhym3/go-endpoints/endpoints"
+	import "github.com/GoogleCloudPlatform/go-endpoints/endpoints"
 
 	func init() {
 	  greetService := &GreetingService{}
