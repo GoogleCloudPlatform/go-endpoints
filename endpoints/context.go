@@ -1,3 +1,5 @@
+// +build appengine
+//
 // Default implementation of Context interface.
 // You can swap this with a stub implementation in tests like so:
 //
