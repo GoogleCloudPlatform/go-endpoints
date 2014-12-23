@@ -253,6 +253,7 @@ type signedJWT struct {
 	Expires  int64  `json:"exp"`
 	IssuedAt int64  `json:"iat"`
 	Issuer   string `json:"iss"`
+	Subject  string `json:"sub"`
 }
 
 // addBase64Pad pads s to be a valid base64-encoded string.
@@ -462,7 +463,7 @@ func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs
 // currentIDTokenUser returns "appengine/user".User object if provided JWT token
 // was successfully decoded and passed all verifications.
 //
-// Currently, only Email field will be set in case of success.
+// Currently, only Email and ID (Subject) field will be set in case of success.
 func currentIDTokenUser(c Context, jwt string, audiences []string, clientIDs []string, now int64) (*user.User, error) {
 	parsedToken, err := jwtParser(c, jwt, now)
 	if err != nil {
@@ -472,6 +473,7 @@ func currentIDTokenUser(c Context, jwt string, audiences []string, clientIDs []s
 	if verifyParsedToken(c, *parsedToken, audiences, clientIDs) {
 		return &user.User{
 			Email: parsedToken.Email,
+			ID:    parsedToken.Subject,
 		}, nil
 	}
 
