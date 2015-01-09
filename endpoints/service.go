@@ -82,6 +82,8 @@ type ServiceMethod struct {
 	method *reflect.Method
 	// info used to construct Endpoints API config
 	info *MethodInfo
+	// is response returned by the method
+	retRes bool
 }
 
 // Info returns a MethodInfo struct of a registered service's method
@@ -176,39 +178,52 @@ func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault
 //
 // It doesn't create ServiceMethod.info if internal == true
 func newServiceMethod(m *reflect.Method, internal bool) *ServiceMethod {
-	mtype := m.Type
 	// Method must be exported.
-	// Method needs four ins: receiver, *http.Request, *args, *reply.
-	if m.PkgPath != "" || mtype.NumIn() != 4 {
+	if m.PkgPath != "" {
 		return nil
 	}
-	// First argument must be a pointer and must be http.Request.
-	reqType := mtype.In(1)
-	if reqType.Kind() != reflect.Ptr || reqType.Elem() != typeOfRequest {
+
+	var httpReqType, reqType, respType, errType reflect.Type
+	mtype := m.Type
+	switch {
+	// method(receiver, *http.Request, *reqType, *resType) error
+	case mtype.NumIn() == 4 && mtype.NumOut() == 1:
+		httpReqType = mtype.In(1)
+		reqType = mtype.In(2)
+		respType = mtype.In(3)
+		errType = mtype.Out(0)
+	// method(receiver, *http.Request, *reqType) (*resType, error)
+	case mtype.NumIn() == 3 && mtype.NumOut() == 2:
+		httpReqType = mtype.In(1)
+		reqType = mtype.In(2)
+		respType = mtype.Out(0)
+		errType = mtype.Out(1)
+	default:
 		return nil
 	}
-	// Second argument must be a pointer and must be exported.
-	args := mtype.In(2)
-	if args.Kind() != reflect.Ptr || !isExportedOrBuiltin(args) {
+
+	// httpReqType must be a pointer and must be http.Request.
+	if httpReqType.Kind() != reflect.Ptr || httpReqType.Elem() != typeOfRequest {
 		return nil
 	}
-	// Third argument must be a pointer and must be exported.
-	reply := mtype.In(3)
-	if reply.Kind() != reflect.Ptr || !isExportedOrBuiltin(reply) {
+	// reqType must be a pointer and must be exported.
+	if reqType.Kind() != reflect.Ptr || !isExportedOrBuiltin(reqType) {
 		return nil
 	}
-	// Method needs one out: error.
-	if mtype.NumOut() != 1 {
+	// respType must be a pointer and must be exported.
+	if respType.Kind() != reflect.Ptr || !isExportedOrBuiltin(respType) {
 		return nil
 	}
-	if returnType := mtype.Out(0); returnType != typeOfOsError {
+	// errType must be an error.
+	if errType != typeOfOsError {
 		return nil
 	}
 
 	method := &ServiceMethod{
 		method:   m,
-		ReqType:  args.Elem(),
-		RespType: reply.Elem(),
+		ReqType:  reqType.Elem(),
+		RespType: respType.Elem(),
+		retRes:   mtype.NumOut() == 2,
 	}
 	if !internal {
 		mname := strings.ToLower(m.Name)

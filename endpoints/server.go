@@ -132,16 +132,26 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Initialize RPC method response and call method's function
-	resp := reflect.New(methodSpec.RespType)
-	errValue := methodSpec.method.Func.Call([]reflect.Value{
+	params := []reflect.Value{
 		serviceSpec.rcvr,
 		reflect.ValueOf(r),
 		req,
-		resp,
-	})
+	}
+	var resp reflect.Value
+	if !methodSpec.retRes {
+		resp = reflect.New(methodSpec.RespType)
+		params = append(params, resp)
+	}
+	results := methodSpec.method.Func.Call(params)
 
 	// Check if method returned an error
-	if err := errValue[0].Interface(); err != nil {
+	errValue := results[0]
+	if methodSpec.retRes {
+		resp = results[0]
+		errValue = results[1]
+	}
+
+	if err := errValue.Interface(); err != nil {
 		writeError(w, err.(error))
 		return
 	}
