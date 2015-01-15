@@ -34,26 +34,22 @@ Then, a service:
 
 	// List responds with a list of all greetings ordered by Date field.
 	// Most recent greets come first.
-	func (gs *GreetingService) List(
-	  r *http.Request, req *GreetingsListReq, resp *GreetingsList) error {
-
-	  if req.Limit <= 0 {
-	    req.Limit = 10
+	func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*GreetingsList, error) {
+	  if r.Limit <= 0 {
+	    r.Limit = 10
 	  }
 
-	  c := endpoints.NewContext(r)
-	  q := datastore.NewQuery("Greeting").Order("-Date").Limit(req.Limit)
-	  greets := make([]*Greeting, 0, req.Limit)
+	  q := datastore.NewQuery("Greeting").Order("-Date").Limit(r.Limit)
+	  greets := make([]*Greeting, 0, r.Limit)
 	  keys, err := q.GetAll(c, &greets)
 	  if err != nil {
-	    return err
+	    return nil, err
 	  }
 
 	  for i, k := range keys {
 	    greets[i].Key = k
 	  }
-	  resp.Items = greets
-	  return nil
+	  return &GreetingsList{greets}, nil
 	}
 
 
@@ -109,7 +105,7 @@ json.Unmarshaler interfaces.
 
 Let's say we have this method:
 
-	func (s *MyService) ListItems(r *http.Request, req *ListReq, resp *ItemsList) error {
+	func (s *MyService) ListItems(c endpoints.Context, r *ListReq) (*ItemsList, error) {
 	  // fetch a list of items
 	}
 
@@ -153,13 +149,12 @@ of type QueryMarker:
 Now that our QueryMarker implements required interfaces we can use ListReq.Page
 field as if it were a `datastore.Cursor` in our service method, for instance:
 
-	func (s *MyService) ListItems(r *http.Request, req *ListReq, list *ItemsList) error {
-	    c := endpoints.NewContext(r)
-	    list.Items = make([]*Item, 0, req.Limit)
+	func (s *MyService) ListItems(c endpoints.Context, r *ListReq) (*ItemsList, error) {
+	    list := &ItemsList{Items: make([]*Item, 0, r.Limit)}
 
-	    q := datastore.NewQuery("Item").Limit(req.Limit)
-	    if req.Page != nil {
-	        q = q.Start(req.Page.Cursor)
+	    q := datastore.NewQuery("Item").Limit(r.Limit)
+	    if r.Page != nil {
+	        q = q.Start(r.Page.Cursor)
 	    }
 
 	    var iter *datastore.Iterator
@@ -170,7 +165,7 @@ field as if it were a `datastore.Cursor` in our service method, for instance:
 	            break
 	        }
 	        if err != nil {
-	          return err
+	          return nil, err
 	        }
 	        item.Key = key
 	        list.Items = append(list.Items, &item)
@@ -178,10 +173,10 @@ field as if it were a `datastore.Cursor` in our service method, for instance:
 
 	    cur, err := iter.Cursor()
 	    if err != nil {
-	        return err
+	        return nil, err
 	    }
 	    list.Next = &QueryMarker{cur}
-	    return nil
+	    return list, nil
 	}
 
 A serialized ItemsList would then look something like this:
@@ -215,13 +210,13 @@ out of the box, if I wanted to:
 	}
 
 	// defined with "users/{id}" path template
-	func (s *MyService) GetUser(r *http.Request, req *GetUserReq, user *User) error {
-	  c := endpoints.NewContext(r)
-	  if err := datastore.Get(c, req.Key, user); err != nil {
-	    return err
+	func (s *MyService) GetUser(c endpoints.Context, r *GetUserReq) (*User, error) {
+	  user := &User{}
+	  if err := datastore.Get(c, r.Key, user); err != nil {
+	    return nil, err
 	  }
-	  user.Key = req.Key
-	  return nil
+	  user.Key = r.Key
+	  return user, nil
 	}
 
 JSON would then look something like this:

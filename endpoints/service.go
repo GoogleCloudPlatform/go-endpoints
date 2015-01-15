@@ -22,6 +22,8 @@ var (
 	typeOfOsError = reflect.TypeOf((*error)(nil)).Elem()
 	// Same as above, this time for http.Request.
 	typeOfRequest = reflect.TypeOf((*http.Request)(nil)).Elem()
+	// Precompute the reflect type for Context.
+	typeOfContext = reflect.TypeOf((*Context)(nil)).Elem()
 )
 
 // ----------------------------------------------------------------------------
@@ -80,6 +82,10 @@ type ServiceMethod struct {
 	RespType reflect.Type
 	// method's receiver
 	method *reflect.Method
+	// first argument of the method is Context
+	wantsContext bool
+	// it's up to the method to create and return RespType
+	returnsResp bool
 	// info used to construct Endpoints API config
 	info *MethodInfo
 }
@@ -176,39 +182,53 @@ func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault
 //
 // It doesn't create ServiceMethod.info if internal == true
 func newServiceMethod(m *reflect.Method, internal bool) *ServiceMethod {
-	mtype := m.Type
 	// Method must be exported.
-	// Method needs four ins: receiver, *http.Request, *args, *reply.
-	if m.PkgPath != "" || mtype.NumIn() != 4 {
+	if m.PkgPath != "" {
 		return nil
 	}
-	// First argument must be a pointer and must be http.Request.
-	reqType := mtype.In(1)
-	if reqType.Kind() != reflect.Ptr || reqType.Elem() != typeOfRequest {
+
+	var httpReqType, reqType, respType, errType reflect.Type
+	mtype := m.Type
+	switch {
+	// method(receiver, *http.Request, *reqType, *resType) error
+	case mtype.NumIn() == 4 && mtype.NumOut() == 1:
+		httpReqType = mtype.In(1)
+		reqType = mtype.In(2)
+		respType = mtype.In(3)
+		errType = mtype.Out(0)
+	// method(receiver, *http.Request, *reqType) (*resType, error)
+	case mtype.NumIn() == 3 && mtype.NumOut() == 2:
+		httpReqType = mtype.In(1)
+		reqType = mtype.In(2)
+		respType = mtype.Out(0)
+		errType = mtype.Out(1)
+	default:
+		return nil
+	}
+
+	// First argument must be a pointer and must be http.Request or Context.
+	if !isRequestOrContext(httpReqType) {
 		return nil
 	}
 	// Second argument must be a pointer and must be exported.
-	args := mtype.In(2)
-	if args.Kind() != reflect.Ptr || !isExportedOrBuiltin(args) {
+	if reqType.Kind() != reflect.Ptr || !isExportedOrBuiltin(reqType) {
 		return nil
 	}
-	// Third argument must be a pointer and must be exported.
-	reply := mtype.In(3)
-	if reply.Kind() != reflect.Ptr || !isExportedOrBuiltin(reply) {
+	// Return value must be a pointer and must be exported.
+	if respType.Kind() != reflect.Ptr || !isExportedOrBuiltin(respType) {
 		return nil
 	}
-	// Method needs one out: error.
-	if mtype.NumOut() != 1 {
-		return nil
-	}
-	if returnType := mtype.Out(0); returnType != typeOfOsError {
+	// Last return value must be of error type
+	if errType != typeOfOsError {
 		return nil
 	}
 
 	method := &ServiceMethod{
-		method:   m,
-		ReqType:  args.Elem(),
-		RespType: reply.Elem(),
+		ReqType:      reqType.Elem(),
+		RespType:     respType.Elem(),
+		method:       m,
+		wantsContext: httpReqType.Implements(typeOfContext),
+		returnsResp:  mtype.NumOut() > 1,
 	}
 	if !internal {
 		mname := strings.ToLower(m.Name)
@@ -305,4 +325,12 @@ func isExportedOrBuiltin(t reflect.Type) bool {
 	// PkgPath will be non-empty even for an exported type,
 	// so we need to check the type name as well.
 	return isExported(t.Name()) || t.PkgPath() == ""
+}
+
+// isRequestOrContext returns true if type t is either *http.Request or Context
+func isRequestOrContext(t reflect.Type) bool {
+	if t.Implements(typeOfContext) {
+		return true
+	}
+	return t.Kind() == reflect.Ptr && t.Elem() == typeOfRequest
 }
