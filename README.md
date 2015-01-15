@@ -51,26 +51,22 @@ type GreetingService struct {
 
 // List responds with a list of all greetings ordered by Date field.
 // Most recent greets come first.
-func (gs *GreetingService) List(
-  r *http.Request, req *GreetingsListReq, resp *GreetingsList) error {
-
-  if req.Limit <= 0 {
-    req.Limit = 10
+func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*GreetingsList, error) {
+  if r.Limit <= 0 {
+    r.Limit = 10
   }
 
-  c := endpoints.NewContext(r)
-  q := datastore.NewQuery("Greeting").Order("-Date").Limit(req.Limit)
-  greets := make([]*Greeting, 0, req.Limit)
+  q := datastore.NewQuery("Greeting").Order("-Date").Limit(r.Limit)
+  greets := make([]*Greeting, 0, r.Limit)
   keys, err := q.GetAll(c, &greets)
   if err != nil {
-    return err
+    return nil, err
   }
 
   for i, k := range keys {
     greets[i].Key = k
   }
-  resp.Items = greets
-  return nil
+  return &GreetingsList{greets}, nil
 }
 ```
 
