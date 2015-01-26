@@ -1,3 +1,5 @@
+// +build appengine
+
 // Testing utils
 
 package endpoints

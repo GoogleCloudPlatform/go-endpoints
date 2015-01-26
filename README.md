@@ -1,5 +1,5 @@
-<a href="https://travis-ci.org/crhym3/go-endpoints" target="_blank">
-  <img align="right" src="https://api.travis-ci.org/crhym3/go-endpoints.png"
+<a href="https://travis-ci.org/GoogleCloudPlatform/go-endpoints" target="_blank">
+  <img align="right" src="https://api.travis-ci.org/GoogleCloudPlatform/go-endpoints.png"
        alt="Build Status">
 </a>
 # Cloud Endpoints for Go
@@ -12,36 +12,9 @@ documentation for [Python][1] or [Java][2].
 
 ## Install
 
-Start with `go get github.com/crhym3/go-endpoints/endpoints`. If this is not
-the first time you're "getting" the package, add `-u` param to get an updated
-version, i.e. `go get -u ...`.
-
-Now, you'll see a couple errors:
-
+```bash
+go get -u github.com/GoogleCloudPlatform/go-endpoints/endpoints
 ```
-package appengine: unrecognized import path "appengine"
-package appengine/user: unrecognized import path "appengine/user"
-package appengine_internal/user: unrecognized import path "appengine_internal/user"
-```
-
-which is OK, don't worry! The issue here is Go looks at all imports in
-`endpoints` package and cannot find "appengine/*" packages nowhere in your
-`$GOPATH`. That's because they're not there, indeed. Appengine packages are
-normally available only when running an app with dev appserver, and since that's
-precisely what we want to do, "unrecognized import path" errors can be safely
-ignored.
-
-
-Alternatively, use [goapp tool][goapp] from the Google App Engine SDK for Go
-to get the package:
-
-```
-GO_APPENGINE/goapp get github.com/crhym3/go-endpoints/endpoints
-```
-
-If you'll ever need to pull updates from the upstream, execute `git pull`
-from the root of this repo.
-
 
 ## Usage
 
@@ -78,26 +51,22 @@ type GreetingService struct {
 
 // List responds with a list of all greetings ordered by Date field.
 // Most recent greets come first.
-func (gs *GreetingService) List(
-  r *http.Request, req *GreetingsListReq, resp *GreetingsList) error {
-
-  if req.Limit <= 0 {
-    req.Limit = 10
+func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*GreetingsList, error) {
+  if r.Limit <= 0 {
+    r.Limit = 10
   }
 
-  c := endpoints.NewContext(r)
-  q := datastore.NewQuery("Greeting").Order("-Date").Limit(req.Limit)
-  greets := make([]*Greeting, 0, req.Limit)
+  q := datastore.NewQuery("Greeting").Order("-Date").Limit(r.Limit)
+  greets := make([]*Greeting, 0, r.Limit)
   keys, err := q.GetAll(c, &greets)
   if err != nil {
-    return err
+    return nil, err
   }
 
   for i, k := range keys {
     greets[i].Key = k
   }
-  resp.Items = greets
-  return nil
+  return &GreetingsList{greets}, nil
 }
 ```
 
@@ -105,7 +74,7 @@ Last step is to make the above available as a **discoverable API**
 and leverage all the juicy stuff Cloud Endpoints are great at.
 
 ```go
-import "github.com/crhym3/go-endpoints/endpoints"
+import "github.com/GoogleCloudPlatform/go-endpoints/endpoints"
 
 func init() {
   greetService := &GreetingService{}
@@ -270,7 +239,7 @@ GO_APPENGINE_SDK/goapp test -v ./endpoints 2> /dev/null
 [8]: https://developers.google.com/appengine/docs/python/endpoints/consume_android
 [9]: https://developers.google.com/appengine/docs/python/endpoints/consume_ios
 [10]: https://developers.google.com/appengine/docs/python/endpoints/consume_js
-[11]: http://godoc.org/github.com/crhym3/go-endpoints/endpoints
-[12]: https://github.com/crhym3/go-endpoints/wiki
+[11]: http://godoc.org/github.com/GoogleCloudPlatform/go-endpoints/endpoints
+[12]: https://github.com/GoogleCloudPlatform/go-endpoints/wiki
 [13]: https://go-endpoints.appspot.com/tictactoe
 [goapp]: http://blog.golang.org/appengine-dec2013

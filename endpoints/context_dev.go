@@ -1,3 +1,5 @@
+// +build appengine
+//
 // This implementation of Context interface uses tokeninfo API to validate
 // bearer token.
 //

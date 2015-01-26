@@ -1,3 +1,5 @@
+// +build appengine
+
 // Copyright 2009 The Go Authors. All rights reserved.
 // Copyright 2012 The Gorilla Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -45,10 +47,14 @@ func NewServer(root string) *Server {
 //    - The receiver is exported (begins with an upper case letter) or local
 //      (defined in the package registering the service).
 //    - The method name is exported.
-//    - The method has three arguments: *http.Request, *args, *reply.
-//    - All three arguments are pointers.
-//    - The second and third arguments are exported or local.
-//    - The method has return type error.
+//    - The method has either 2 arguments and 2 return values:
+//      *http.Request|Context, *arg => *reply, error
+//      or 3 arguments and 1 return value:
+//      *http.Request|Context, *arg, *reply => error
+//    - The first argument is either *http.Request or Context.
+//    - Second argument (*arg) and *reply are exported or local.
+//    - First argument, *arg and *reply are all pointers.
+//    - First (or second, if method has 2 arguments) return value is of type error.
 //
 // All other methods are ignored.
 func (s *Server) RegisterService(srv interface{}, name, ver, desc string, isDefault bool) (*RPCService, error) {
@@ -111,7 +117,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Initialize RPC method request
-	req := reflect.New(methodSpec.ReqType)
+	reqValue := reflect.New(methodSpec.ReqType)
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -124,28 +130,42 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 	writeError(w, fmt.Errorf("Error while decoding JSON: %q", err))
 	// 	return
 	// }
-	if err := json.Unmarshal(body, req.Interface()); err != nil {
+	if err := json.Unmarshal(body, reqValue.Interface()); err != nil {
 		writeError(w, err)
 		return
 	}
 
-	// Initialize RPC method response and call method's function
-	resp := reflect.New(methodSpec.RespType)
-	errValue := methodSpec.method.Func.Call([]reflect.Value{
-		serviceSpec.rcvr,
-		reflect.ValueOf(r),
-		req,
-		resp,
-	})
+	// Construct arguments for the method call
+	var httpReqOrCtx interface{} = r
+	if methodSpec.wantsContext {
+		httpReqOrCtx = c
+	}
+	args := []reflect.Value{serviceSpec.rcvr, reflect.ValueOf(httpReqOrCtx), reqValue}
+
+	var respValue reflect.Value
+	if !methodSpec.returnsResp {
+		respValue = reflect.New(methodSpec.RespType)
+		args = append(args, respValue)
+	}
+
+	// Invoke the service method
+	var errValue reflect.Value
+	res := methodSpec.method.Func.Call(args)
+	if methodSpec.returnsResp {
+		respValue = res[0]
+		errValue = res[1]
+	} else {
+		errValue = res[0]
+	}
 
 	// Check if method returned an error
-	if err := errValue[0].Interface(); err != nil {
+	if err := errValue.Interface(); err != nil {
 		writeError(w, err.(error))
 		return
 	}
 
 	// Encode non-error response
-	if err := json.NewEncoder(w).Encode(resp.Interface()); err != nil {
+	if err := json.NewEncoder(w).Encode(respValue.Interface()); err != nil {
 		writeError(w, err)
 	}
 }

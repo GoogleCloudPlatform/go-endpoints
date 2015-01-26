@@ -1,3 +1,5 @@
+// +build appengine
+
 package endpoints
 
 import (
@@ -154,7 +156,7 @@ func TestAPIDescriptor(t *testing.T) {
 // ---------------------------------------------------------------------------
 // $METHOD_MAP
 
-func TestApiPostMethod(t *testing.T) {
+func TestAPIPostMethod(t *testing.T) {
 	d := createDescriptor(t)
 	meth := d.Methods["dummy.post"]
 	if meth == nil {
@@ -203,7 +205,7 @@ func TestApiPostMethod(t *testing.T) {
 	}
 }
 
-func TestApiPutAuthMethod(t *testing.T) {
+func TestAPIPutAuthMethod(t *testing.T) {
 	d := createDescriptor(t)
 	meth := d.Methods["dummy.auth"]
 	if meth == nil {
@@ -224,7 +226,7 @@ func TestApiPutAuthMethod(t *testing.T) {
 	)
 }
 
-func TestApiGetSubMethod(t *testing.T) {
+func TestAPIGetSubMethod(t *testing.T) {
 	d := createDescriptor(t)
 	// apiname.resource.method
 	meth := d.Methods["dummy.sub.sub"]
@@ -290,7 +292,7 @@ func TestApiGetSubMethod(t *testing.T) {
 	}
 }
 
-func TestApiGetListMethod(t *testing.T) {
+func TestAPIGetListMethod(t *testing.T) {
 	d := createDescriptor(t)
 	meth := d.Methods["dummy.list"]
 	if meth == nil {
