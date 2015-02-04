@@ -135,15 +135,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	numIn, numOut := methodSpec.method.Type.NumIn(), methodSpec.method.Type.NumOut()
 	// Construct arguments for the method call
 	var httpReqOrCtx interface{} = r
 	if methodSpec.wantsContext {
 		httpReqOrCtx = c
 	}
-	args := []reflect.Value{serviceSpec.rcvr, reflect.ValueOf(httpReqOrCtx), reqValue}
+	args := []reflect.Value{serviceSpec.rcvr, reflect.ValueOf(httpReqOrCtx)}
+	if numIn > 2 {
+		args = append(args, reqValue)
+	}
 
 	var respValue reflect.Value
-	if !methodSpec.returnsResp {
+	if numIn > 3 {
 		respValue = reflect.New(methodSpec.RespType)
 		args = append(args, respValue)
 	}
@@ -151,7 +155,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Invoke the service method
 	var errValue reflect.Value
 	res := methodSpec.method.Func.Call(args)
-	if methodSpec.returnsResp {
+	if numOut == 2 {
 		respValue = res[0]
 		errValue = res[1]
 	} else {
@@ -165,8 +169,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Encode non-error response
-	if err := json.NewEncoder(w).Encode(respValue.Interface()); err != nil {
-		writeError(w, err)
+	if numIn == 4 || numOut == 2 {
+		if err := json.NewEncoder(w).Encode(respValue.Interface()); err != nil {
+			writeError(w, err)
+		}
 	}
 }
 
