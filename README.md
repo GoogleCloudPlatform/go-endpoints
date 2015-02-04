@@ -70,6 +70,29 @@ func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*Gree
 }
 ```
 
+We can also define methods that don't require a response or a request.
+```go
+// Add adds a greeting.
+func (gs *GreetingService) Add(c endpoints.Context, g *Greeting) error {
+    k := datastore.NewIncompleteKey(c, "Greeting", nil)
+    _, err := datastore.Put(c, k, g)
+    return err
+}
+
+type Count struct {
+    N int `json:"count"`
+}
+
+// Count returns the number of greetings.
+func (gs *GreetingService) Count(c endpoints.Context) (*Count, error) {
+    n, err := datastore.NewQuery("Greeting").Count(c)
+    if err != nil {
+        return nil, err
+    }
+    return &Count{n}, nil
+}
+```
+
 Last step is to make the above available as a **discoverable API**
 and leverage all the juicy stuff Cloud Endpoints are great at.
 
@@ -81,13 +104,21 @@ func init() {
   api, err := endpoints.RegisterService(greetService,
     "greeting", "v1", "Greetings API", true)
   if err != nil {
-    panic(err.Error())
+    log.Fatalf("Register service: %v", err)
   }
 
-  info := api.MethodByName("List").Info()
-  info.Name, info.HTTPMethod, info.Path, info.Desc =
-    "greets.list", "GET", "greetings", "List most recent greetings."
+  register = func(orig, name, method, path, desc string) {
+      m := api.MethodByName(orig)
+      if m == nil {
+          log.Fatalf("Missing method %s", orig)
+      }
+      i := m.Info()
+      i.Name, i.HTTPMethod, i.Path, i.Desc = name, method, path, desc
+  }
 
+  register("List", "greets.list", "GET", "greetings", "List most recent greetings.")
+  register("Add", "greets.add", "PUT", "greetings", "Add a greeting.")
+  register("Count", "greets.count", "GET", "greetings/count", "Count all greetings.")
   endpoints.HandleHTTP()
 }
 ```
@@ -121,9 +152,9 @@ Naturally, API Explorer works too:
 
 Time to deploy the app on [appengine.appspot.com][7]!
 
-**N.B.** At present, you can't map your endpoint URL to a custom domain. Bossylobster 
+**N.B.** At present, you can't map your endpoint URL to a custom domain. Bossylobster
 [wrote](http://stackoverflow.com/a/16124815/1745000): "It's a non-trivial networking problem
-and something Google certainly plan on supporting in the future. Keep in mind, Cloud Endpoints 
+and something Google certainly plan on supporting in the future. Keep in mind, Cloud Endpoints
 is a combination or App Engine and Google's API Infrastructure."
 
 ## Generate client libs
@@ -212,7 +243,7 @@ Or you can just play it on the [live demo app][13].
 
 You'll need Google App Engine SDK for Go to run tests.
 
-Once you get that installed, use `goapp` tool to run all tests from the root 
+Once you get that installed, use `goapp` tool to run all tests from the root
 of this repo:
 
 ```
