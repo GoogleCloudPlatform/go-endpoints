@@ -104,21 +104,21 @@ func init() {
   api, err := endpoints.RegisterService(greetService,
     "greeting", "v1", "Greetings API", true)
   if err != nil {
-    panic(err.Error())
+    log.Fatalf("Register service: %v", err)
   }
 
-  info := api.MethodByName("List").Info()
-  info.Name, info.HTTPMethod, info.Path, info.Desc =
-    "greets.list", "GET", "greetings", "List most recent greetings."
+  register = func(orig, name, method, path, desc string) {
+      m := api.MethodByName(orig)
+      if m == nil {
+          log.Fatalf("Missing method %s", orig)
+      }
+      i := m.Info()
+      i.Name, i.HTTPMethod, i.Path, i.Desc = name, method, path, desc
+  }
 
-  info = api.MethodByName("Add").Info()
-  info.Name, info.HTTPMethod, info.Path, info.Desc =
-    "greets.add", "PUT", "greetings", "Add a greeting."
-
-  info = api.MethodByName("Count").Info()
-  info.Name, info.HTTPMethod, info.Path, info.Desc =
-    "greets.count", "GET", "greetings/count", "Count all greetings."
-
+  register("List", "greets.list", "GET", "greetings", "List most recent greetings.")
+  register("Add", "greets.add", "PUT", "greetings", "Add a greeting.")
+  register("Count", "greets.count", "GET", "greetings/count", "Count all greetings.")
   endpoints.HandleHTTP()
 }
 ```
