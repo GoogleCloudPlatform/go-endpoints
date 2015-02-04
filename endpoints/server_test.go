@@ -86,6 +86,27 @@ func (s *ServerTestService) MsgWithReturn(c Context, req *TestMsg) (*TestMsg, er
 	return &TestMsg{req.Name}, nil
 }
 
+func (s *ServerTestService) MsgWithoutRequest(c Context) (*TestMsg, error) {
+	if c == nil {
+		return nil, errors.New("MsgReturnResp: c = nil")
+	}
+	return &TestMsg{}, nil
+}
+
+func (s *ServerTestService) MsgWithoutRespose(c Context, req *TestMsg) error {
+	if c == nil {
+		return errors.New("MsgReturnResp: c = nil")
+	}
+	return nil
+}
+
+func (s *ServerTestService) MsgWithoutRequestNorRespose(c Context) error {
+	if c == nil {
+		return errors.New("MsgReturnResp: c = nil")
+	}
+	return nil
+}
+
 func createAPIServer() *Server {
 	s := &ServerTestService{}
 	rpc := &RPCService{
@@ -99,12 +120,13 @@ func createAPIServer() *Server {
 		sm := &ServiceMethod{
 			method:       &m,
 			wantsContext: m.Type.In(1).Implements(typeOfContext),
-			ReqType:      m.Type.In(2).Elem(),
+		}
+		if m.Type.NumIn() > 2 {
+			sm.ReqType = m.Type.In(2).Elem()
 		}
 		if m.Type.NumOut() == 2 {
-			sm.returnsResp = true
 			sm.RespType = m.Type.Out(0).Elem()
-		} else {
+		} else if m.Type.NumIn() > 3 {
 			sm.RespType = m.Type.In(3).Elem()
 		}
 		rpc.methods[m.Name] = sm
@@ -243,9 +265,6 @@ func TestServerRegisterService(t *testing.T) {
 		}
 		if m.wantsContext != tt.wantsContext {
 			t.Errorf("%d: wantsContext = %v; want %v", i, m.wantsContext, tt.wantsContext)
-		}
-		if m.returnsResp != tt.returnsResp {
-			t.Errorf("%d: returnsResp = %v; want %v", i, m.returnsResp, tt.returnsResp)
 		}
 	}
 }
