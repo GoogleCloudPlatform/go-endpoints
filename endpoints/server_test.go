@@ -81,28 +81,28 @@ func (s *ServerTestService) MsgWithContext(c Context, req, resp *TestMsg) error 
 
 func (s *ServerTestService) MsgWithReturn(c Context, req *TestMsg) (*TestMsg, error) {
 	if c == nil {
-		return nil, errors.New("MsgReturnResp: c = nil")
+		return nil, errors.New("MsgWithReturn: c = nil")
 	}
 	return &TestMsg{req.Name}, nil
 }
 
 func (s *ServerTestService) MsgWithoutRequest(c Context) (*TestMsg, error) {
 	if c == nil {
-		return nil, errors.New("MsgReturnResp: c = nil")
+		return nil, errors.New("MsgWithoutRequest: c = nil")
 	}
 	return &TestMsg{}, nil
 }
 
-func (s *ServerTestService) MsgWithoutRespose(c Context, req *TestMsg) error {
+func (s *ServerTestService) MsgWithoutResponse(c Context, req *TestMsg) error {
 	if c == nil {
-		return errors.New("MsgReturnResp: c = nil")
+		return errors.New("MsgWithoutResponse: c = nil")
 	}
 	return nil
 }
 
-func (s *ServerTestService) MsgWithoutRequestNorRespose(c Context) error {
+func (s *ServerTestService) MsgWithoutRequestNorResponse(c Context) error {
 	if c == nil {
-		return errors.New("MsgReturnResp: c = nil")
+		return errors.New("MsgWithoutRequestNorResponse: c = nil")
 	}
 	return nil
 }
