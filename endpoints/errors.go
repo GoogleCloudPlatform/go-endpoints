@@ -4,6 +4,7 @@ package endpoints
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -68,34 +69,39 @@ func NewAPIError(name string, msg string, code int) error {
 	return &APIError{Name: name, Msg: msg, Code: code}
 }
 
+// Errorf creates a new APIError for custom error given a format string and arguments.
+func Errorf(code int, name string, format string, args ...interface{}) error {
+	return &APIError{Name: name, Msg: fmt.Sprintf(format, args...), Code: code}
+}
+
 // NewInternalServerError creates a new APIError with Internal Server Error status (500)
-func NewInternalServerError(msg string) error {
-	return NewAPIError("Internal Server Error", msg, http.StatusInternalServerError)
+func NewInternalServerError(format string, args ...interface{}) error {
+	return Errorf(http.StatusInternalServerError, "Internal Server Error", format, args...)
 }
 
 // NewBadRequestError creates a new APIError with Bad Request status (400)
-func NewBadRequestError(msg string) error {
-	return NewAPIError("Bad Request", msg, http.StatusBadRequest)
+func NewBadRequestError(format string, args ...interface{}) error {
+	return Errorf(http.StatusBadRequest, "Bad Request", format, args...)
 }
 
 // NewUnauthorizedError creates a new APIError with Unauthorized status (401)
-func NewUnauthorizedError(msg string) error {
-	return NewAPIError("Unauthorized", msg, http.StatusUnauthorized)
+func NewUnauthorizedError(format string, args ...interface{}) error {
+	return Errorf(http.StatusUnauthorized, "Unauthorized", format, args...)
 }
 
 // NewNotFoundError creates a new APIError with Not Found status (404)
-func NewNotFoundError(msg string) error {
-	return NewAPIError("Not Found", msg, http.StatusNotFound)
+func NewNotFoundError(format string, args ...interface{}) error {
+	return Errorf(http.StatusNotFound, "Not Found", format, args...)
 }
 
 // NewForbiddenError creates a new APIError with Forbidden status (403)
-func NewForbiddenError(msg string) error {
-	return NewAPIError("Forbidden", msg, http.StatusForbidden)
+func NewForbiddenError(format string, args ...interface{}) error {
+	return Errorf(http.StatusForbidden, "Forbidden", format, args...)
 }
 
 // NewConflictError creates a new APIError with Conflict status (409)
-func NewConflictError(msg string) error {
-	return NewAPIError("Conflict", msg, http.StatusConflict)
+func NewConflictError(format string, args ...interface{}) error {
+	return Errorf(http.StatusConflict, "Conflict", format, args...)
 }
 
 // errorResponse is SPI-compatible error response
