@@ -26,15 +26,14 @@ var (
 	// ConflictError is default error with http.StatusConflict (409)
 	ConflictError = NewConflictError("")
 
-	// errorNames is a map of known error names (or better, their prefixes).
-	// See newErrorResponse method for details.
-	errorNames = map[int]string{
-		http.StatusInternalServerError: "Internal Server Error",
-		http.StatusBadRequest:          "Bad Request",
-		http.StatusUnauthorized:        "Unauthorized",
-		http.StatusForbidden:           "Forbidden",
-		http.StatusNotFound:            "Not Found",
-		http.StatusConflict:            "Conflict",
+	// knownErrors is a list of all known errors.
+	knownErrors = [...]int{
+		http.StatusInternalServerError,
+		http.StatusBadRequest,
+		http.StatusUnauthorized,
+		http.StatusForbidden,
+		http.StatusNotFound,
+		http.StatusConflict,
 	}
 )
 
@@ -52,12 +51,12 @@ func (a *APIError) Error() string {
 
 // NewAPIError Create a new APIError for custom error
 func NewAPIError(name string, msg string, code int) error {
-	return &APIError{Name: name, Msg: msg, Code: code}
+	return &APIError{name, msg, code}
 }
 
 // errorf creates a new APIError given its status code, a format string and its arguments.
 func errorf(code int, format string, args ...interface{}) error {
-	return &APIError{Name: errorNames[code], Msg: fmt.Sprintf(format, args...), Code: code}
+	return &APIError{http.StatusText(code), fmt.Sprintf(format, args...), code}
 }
 
 // NewInternalServerError creates a new APIError with Internal Server Error status (500)
@@ -100,7 +99,7 @@ type errorResponse struct {
 }
 
 // Creates and initializes a new errorResponse.
-// If msg contains any of errorNames then errorResponse.Name will be set
+// If msg contains any of knownErrors then errorResponse.Name will be set
 // to that name and the rest of the msg becomes errorResponse.Msg.
 // Otherwise, a default error name is used and msg argument
 // is errorResponse.Msg.
@@ -109,14 +108,14 @@ func newErrorResponse(err error) *errorResponse {
 		return &errorResponse{"APPLICATION_ERROR", e.Name, e.Msg, e.Code}
 	}
 	msg := err.Error()
-	for code, name := range errorNames {
-		if strings.HasPrefix(msg, name) {
+	for _, code := range knownErrors {
+		if name := http.StatusText(code); strings.HasPrefix(msg, name) {
 			return &errorResponse{"APPLICATION_ERROR", name, strings.Trim(msg[len(name):], " :"), code}
 		}
 	}
 	//for compatibility, Before behavior, always return 400 HTTP Status Code.
 	// TODO(alex): where is 400 coming from?
-	return &errorResponse{"APPLICATION_ERROR", errorNames[http.StatusInternalServerError], msg, http.StatusBadRequest}
+	return &errorResponse{"APPLICATION_ERROR", http.StatusText(http.StatusInternalServerError), msg, http.StatusBadRequest}
 }
 
 // writeError writes SPI-compatible error response.
