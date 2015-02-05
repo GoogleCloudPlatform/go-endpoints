@@ -14,41 +14,27 @@ var (
 	// Use NewAPIError() method to create your own.
 
 	// InternalServerError is default error with http.StatusInternalServerError (500)
-	InternalServerError = NewInternalServerError(errorNames[0])
+	InternalServerError = NewInternalServerError(errorNames[http.StatusInternalServerError])
 	// BadRequestError is default error with http.StatusBadRequest (400)
-	BadRequestError = NewBadRequestError(errorNames[1])
+	BadRequestError = NewBadRequestError(errorNames[http.StatusBadRequest])
 	// UnauthorizedError is default error with http.StatusUnauthorized (401)
-	UnauthorizedError = NewUnauthorizedError(errorNames[2])
+	UnauthorizedError = NewUnauthorizedError(errorNames[http.StatusUnauthorized])
 	// ForbiddenError is default error with http.StatusForbidden (403)
-	ForbiddenError = NewForbiddenError(errorNames[3])
+	ForbiddenError = NewForbiddenError(errorNames[http.StatusForbidden])
 	// NotFoundError is default error with http.StatusNotFound (404)
-	NotFoundError = NewNotFoundError(errorNames[4])
+	NotFoundError = NewNotFoundError(errorNames[http.StatusNotFound])
 	// ConflictError is default error with http.StatusConflict (409)
-	ConflictError = NewConflictError(errorNames[5])
+	ConflictError = NewConflictError(errorNames[http.StatusConflict])
 
-	// errorNames is a slice of known error names (or better, their prefixes).
-	// First element is default error name.
+	// errorNames is a map of known error names (or better, their prefixes).
 	// See newErrorResponse method for details.
-	errorNames = []string{
-		"Internal Server Error",
-		"Bad Request",
-		"Unauthorized",
-		"Forbidden",
-		"Not Found",
-		"Conflict",
-	}
-
-	// errorCodes is a slice of known error codes (or better, their prefixes).
-	// Each errorCodes element corresponds to an errorNames item at the same
-	// position.
-	// See newErrorResponse method for details.
-	errorCodes = []int{
-		http.StatusInternalServerError,
-		http.StatusBadRequest,
-		http.StatusUnauthorized,
-		http.StatusForbidden,
-		http.StatusNotFound,
-		http.StatusConflict,
+	errorNames = map[int]string{
+		http.StatusInternalServerError: "Internal Server Error",
+		http.StatusBadRequest:          "Bad Request",
+		http.StatusUnauthorized:        "Unauthorized",
+		http.StatusForbidden:           "Forbidden",
+		http.StatusNotFound:            "Not Found",
+		http.StatusConflict:            "Conflict",
 	}
 )
 
@@ -118,31 +104,31 @@ type errorResponse struct {
 // to that name and the rest of the msg becomes errorResponse.Msg.
 // Otherwise, a default error name is used and msg argument
 // is errorResponse.Msg.
-func newErrorResponse(e error) *errorResponse {
-	switch t := e.(type) {
-	case *APIError:
-		return &errorResponse{State: "APPLICATION_ERROR", Name: t.Name, Msg: t.Msg, Code: t.Code}
+func newErrorResponse(err error) *errorResponse {
+	if apiErr, ok := err.(*APIError); ok {
+		return &errorResponse{State: "APPLICATION_ERROR", Name: apiErr.Name, Msg: apiErr.Msg, Code: apiErr.Code}
 	}
 
-	msg := e.Error()
-
-	err := &errorResponse{State: "APPLICATION_ERROR"}
-	for i, name := range errorNames {
+	msg := err.Error()
+	for code, name := range errorNames {
 		if strings.HasPrefix(msg, name) {
-			err.Name = name
-			err.Msg = strings.TrimPrefix(msg, name)
-			err.Msg = strings.TrimSpace(strings.TrimPrefix(err.Msg, ":"))
-			err.Code = errorCodes[i]
+			return &errorResponse{
+				State: "APPLICATION_ERROR",
+				Name:  name,
+				Msg:   strings.Trim(msg[len(name):], " :"),
+				Code:  code,
+			}
 		}
 	}
-	if err.Name == "" {
-		err.Name = errorNames[0]
-		err.Msg = msg
+
+	return &errorResponse{
+		State: "APPLICATION_ERROR",
+		Name:  errorNames[http.StatusInternalServerError],
+		Msg:   msg,
 		//for compatibility, Before behavior, always return 400 HTTP Status Code.
 		// TODO(alex): where is 400 coming from?
-		err.Code = 400
+		Code: http.StatusBadRequest,
 	}
-	return err
 }
 
 // writeError writes SPI-compatible error response.
