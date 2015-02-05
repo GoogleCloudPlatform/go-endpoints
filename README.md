@@ -107,7 +107,7 @@ func init() {
     log.Fatalf("Register service: %v", err)
   }
 
-  register = func(orig, name, method, path, desc string) {
+  register := func(orig, name, method, path, desc string) {
       m := api.MethodByName(orig)
       if m == nil {
           log.Fatalf("Missing method %s", orig)
