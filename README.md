@@ -12,9 +12,39 @@ documentation for [Python][1] or [Java][2].
 
 ## Install
 
-```bash
-go get -u github.com/GoogleCloudPlatform/go-endpoints/endpoints
+Use [goapp tool][goapp] from the Google App Engine SDK for Go to get the package:
+
 ```
+GO_APPENGINE/goapp get github.com/GoogleCloudPlatform/go-endpoints/endpoints
+```
+
+If you'll ever need to pull updates from the upstream, execute `git pull`
+from the root of this repo.
+
+Alternatively, if you don't have `goapp` for some reason, do the standard
+
+```
+go get github.com/GoogleCloudPlatform/go-endpoints/endpoints
+```
+
+If this is not the first time you're "getting" the package,
+add `-u` param to get an updated version, i.e. `go get -u ...`.
+
+Now, you'll see a couple errors:
+
+```
+package appengine: unrecognized import path "appengine"
+package appengine/user: unrecognized import path "appengine/user"
+package appengine_internal/user: unrecognized import path "appengine_internal/user"
+```
+
+which is OK, don't worry! The issue here is Go looks at all imports in
+`endpoints` package and cannot find "appengine/*" packages nowhere in your
+`$GOPATH`. That's because they're not there, indeed. Appengine packages are
+normally available only when running an app with dev appserver, and since that's
+precisely what we want to do, "unrecognized import path" errors can be safely
+ignored.
+
 
 ## Usage
 
