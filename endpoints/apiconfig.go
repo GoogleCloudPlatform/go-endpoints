@@ -12,7 +12,7 @@ import (
 )
 
 // curlyBrackets is used for generating the key for dups map in APIDescriptor().
-var curlyBrackets = regexp.MustCompile("{.+}")
+var curlyBrackets = regexp.MustCompile("{.+?}")
 
 // APIDescriptor is the top-level struct for a single Endpoints API config.
 type APIDescriptor struct {
