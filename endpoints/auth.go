@@ -13,12 +13,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	"appengine"
-	"appengine/memcache"
-	"appengine/user"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/memcache"
+	"google.golang.org/appengine/user"
 )
 
 const (
@@ -34,8 +35,6 @@ const (
 )
 
 var (
-	ctxsMu                  sync.Mutex
-	ctxs                    = make(map[*http.Request]Context)
 	allowedAuthSchemesUpper = [2]string{"OAUTH", "BEARER"}
 	certNamespace           = "__verify_jwt"
 	clockSkewSecs           = int64(300)   // 5 minutes in seconds
@@ -55,56 +54,56 @@ var (
 		return time.Now().UTC()
 	}
 
-	// ContextFactory takes an in-flight HTTP request and creates a new
-	// context.
+	// AuthenticatorFactory creates a new authenticator.
 	//
 	// It is a variable on purpose. You can set it to a stub implementation
 	// in tests.
-	ContextFactory func(*http.Request) Context
+	AuthenticatorFactory func() Authenticator
 )
 
-// Context represents the context of an in-flight API request.
-// It embeds appengine.Context so you can use it with any other appengine/*
-// package methods.
-type Context interface {
-	appengine.Context
-
-	// HTTPRequest returns the request associated with this context.
-	HTTPRequest() *http.Request
-
-	// Namespace returns a replacement context that operates within the given namespace.
-	Namespace(name string) (Context, error)
-
+// An Authenticator can identify the current user.
+type Authenticator interface {
 	// CurrentOAuthClientID returns a clientID associated with the scope.
-	CurrentOAuthClientID(scope string) (string, error)
+	CurrentOAuthClientID(ctx context.Context, scope string) (string, error)
 
 	// CurrentOAuthUser returns a user of this request for the given scope.
 	// It caches OAuth info at the first call for future invocations.
 	//
 	// Returns an error if data for this scope is not available.
-	CurrentOAuthUser(scope string) (*user.User, error)
+	CurrentOAuthUser(ctx context.Context, scope string) (*user.User, error)
+}
+
+// contextKey is used to store values on a context.
+type contextKey int
+
+// Context value keys.
+const (
+	requestKey contextKey = iota
+	authenticatorKey
+)
+
+// HTTPRequest returns the request associated with a context.
+func HTTPRequest(c context.Context) *http.Request {
+	r, _ := c.Value(requestKey).(*http.Request)
+	return r
+}
+
+// contextAuthenticator returns the authenticator associated with a
+// context, or an error if there is not one.
+func contextAuthenticator(c context.Context) (Authenticator, error) {
+	a, ok := c.Value(authenticatorKey).(Authenticator)
+	if !ok {
+		return nil, errors.New("context has no authenticator (use endpoints.NewContext to create a context)")
+	}
+	return a, nil
 }
 
 // NewContext returns a new context for an in-flight API (HTTP) request.
-func NewContext(req *http.Request) Context {
-	ctxsMu.Lock()
-	defer ctxsMu.Unlock()
-	c, ok := ctxs[req]
-
-	if !ok {
-		c = ContextFactory(req)
-		ctxs[req] = c
-	}
-
+func NewContext(req *http.Request) context.Context {
+	c := appengine.NewContext(req)
+	c = context.WithValue(c, requestKey, req)
+	c = context.WithValue(c, authenticatorKey, AuthenticatorFactory())
 	return c
-}
-
-// destroyContext removes all references to a Context c so that GC can
-// do its thing and collect the garbage.
-func destroyContext(c Context) {
-	ctxsMu.Lock()
-	defer ctxsMu.Unlock()
-	delete(ctxs, c.HTTPRequest())
 }
 
 // getToken looks for Authorization header and returns a token.
@@ -185,7 +184,7 @@ func getCertExpirationTime(h http.Header) time.Duration {
 
 // getCachedCerts fetches public certificates info from DefaultCertURI and
 // caches it for the duration specified in Age header of a response.
-func getCachedCerts(c Context) (*certsList, error) {
+func getCachedCerts(c context.Context) (*certsList, error) {
 	namespacedContext, err := appengine.Namespace(c, certNamespace)
 	if err != nil {
 		return nil, err
@@ -203,10 +202,10 @@ func getCachedCerts(c Context) (*certsList, error) {
 	// to use memcache.
 	var cacheResults = err == memcache.ErrCacheMiss
 	if !cacheResults {
-		c.Debugf(err.Error())
+		log.Debugf(c, "%s", err.Error())
 	}
 
-	c.Debugf("Fetching provider certs from: %s", DefaultCertURI)
+	log.Debugf(c, "Fetching provider certs from: %s", DefaultCertURI)
 	resp, err := newHTTPClient(c).Get(DefaultCertURI)
 	if err != nil {
 		return nil, err
@@ -235,7 +234,7 @@ func getCachedCerts(c Context) (*certsList, error) {
 			}
 			err = memcache.Set(namespacedContext, item)
 			if err != nil {
-				c.Errorf("Error adding Certs to memcache: %v", err)
+				log.Errorf(c, "Error adding Certs to memcache: %v", err)
 			}
 		}
 	}
@@ -308,7 +307,7 @@ func contains(strList []string, value string) bool {
 // (Issuer, Audience, ClientID, etc.)
 //
 // NOTE: do not call this function directly, use jwtParser() instead.
-func verifySignedJWT(c Context, jwt string, now int64) (*signedJWT, error) {
+func verifySignedJWT(c context.Context, jwt string, now int64) (*signedJWT, error) {
 	segments := strings.Split(jwt, ".")
 	if len(segments) != 3 {
 		return nil, fmt.Errorf("Wrong number of segments in token: %s", jwt)
@@ -416,21 +415,21 @@ func verifySignedJWT(c Context, jwt string, now int64) (*signedJWT, error) {
 //
 // Returns true if token passes verification and can be accepted as indicated
 // by audiences and clientIDs args.
-func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs []string) bool {
+func verifyParsedToken(c context.Context, token signedJWT, audiences []string, clientIDs []string) bool {
 	// Verify the issuer.
 	if token.Issuer != "accounts.google.com" {
-		c.Warningf("Issuer was not valid: %s", token.Issuer)
+		log.Warningf(c, "Issuer was not valid: %s", token.Issuer)
 		return false
 	}
 
 	// Check audiences.
 	if token.Audience == "" {
-		c.Warningf("Invalid aud value in token")
+		log.Warningf(c, "Invalid aud value in token")
 		return false
 	}
 
 	if token.ClientID == "" {
-		c.Warningf("Invalid azp value in token")
+		log.Warningf(c, "Invalid azp value in token")
 		return false
 	}
 
@@ -438,21 +437,21 @@ func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs
 	// happens on Android. In the case they are equal, we only need the ClientID to
 	// be in the listed of accepted Client IDs.
 	if token.ClientID != token.Audience && !contains(audiences, token.Audience) {
-		c.Warningf("Audience not allowed: %s", token.Audience)
+		log.Warningf(c, "Audience not allowed: %s", token.Audience)
 		return false
 	}
 
 	// Check allowed client IDs.
 	if len(clientIDs) == 0 {
-		c.Warningf("No allowed client IDs specified. ID token cannot be verified.")
+		log.Warningf(c, "No allowed client IDs specified. ID token cannot be verified.")
 		return false
 	} else if !contains(clientIDs, token.ClientID) {
-		c.Warningf("Client ID is not allowed: %s", token.ClientID)
+		log.Warningf(c, "Client ID is not allowed: %s", token.ClientID)
 		return false
 	}
 
 	if token.Email == "" {
-		c.Warningf("Invalid email value in token")
+		log.Warningf(c, "Invalid email value in token")
 		return false
 	}
 
@@ -463,7 +462,7 @@ func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs
 // was successfully decoded and passed all verifications.
 //
 // Currently, only Email field will be set in case of success.
-func currentIDTokenUser(c Context, jwt string, audiences []string, clientIDs []string, now int64) (*user.User, error) {
+func currentIDTokenUser(c context.Context, jwt string, audiences []string, clientIDs []string, now int64) (*user.User, error) {
 	parsedToken, err := jwtParser(c, jwt, now)
 	if err != nil {
 		return nil, err
@@ -485,9 +484,13 @@ func currentIDTokenUser(c Context, jwt string, audiences []string, clientIDs []s
 // Returns a single scope (one of provided scopes) if the two conditions are met:
 //   - it is found in Context c
 //   - client ID on that scope matches one of clientIDs in the args
-func CurrentBearerTokenScope(c Context, scopes []string, clientIDs []string) (string, error) {
+func CurrentBearerTokenScope(c context.Context, scopes []string, clientIDs []string) (string, error) {
+	auth, err := contextAuthenticator(c)
+	if err != nil {
+		return "", err
+	}
 	for _, scope := range scopes {
-		currentClientID, err := c.CurrentOAuthClientID(scope)
+		currentClientID, err := auth.CurrentOAuthClientID(c, scope)
 		if err != nil {
 			continue
 		}
@@ -499,7 +502,7 @@ func CurrentBearerTokenScope(c Context, scopes []string, clientIDs []string) (st
 		}
 
 		// If none of the client IDs matches, return nil
-		c.Debugf("Couldn't find current client ID %q in %v", currentClientID, clientIDs)
+		log.Debugf(c, "Couldn't find current client ID %q in %v", currentClientID, clientIDs)
 		return "", errors.New("Mismatched Client ID")
 	}
 	// No client ID found for any of the scopes
@@ -514,13 +517,17 @@ func CurrentBearerTokenScope(c Context, scopes []string, clientIDs []string) (st
 // Returns an error if the client did not make a valid request, or none of
 // clientIDs are allowed to make requests, or user did not authorize any of
 // the scopes.
-func CurrentBearerTokenUser(c Context, scopes []string, clientIDs []string) (*user.User, error) {
+func CurrentBearerTokenUser(c context.Context, scopes []string, clientIDs []string) (*user.User, error) {
+	auth, err := contextAuthenticator(c)
+	if err != nil {
+		return nil, err
+	}
 	scope, err := CurrentBearerTokenScope(c, scopes, clientIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.CurrentOAuthUser(scope)
+	return auth.CurrentOAuthUser(c, scope)
 }
 
 // CurrentUser checks for both JWT and Bearer tokens.
@@ -529,14 +536,18 @@ func CurrentBearerTokenUser(c Context, scopes []string, clientIDs []string) (*us
 // and falls back to Bearer token.
 //
 // NOTE: Currently, returned user will have only Email field set when JWT is used.
-func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []string) (*user.User, error) {
+func CurrentUser(c context.Context, scopes []string, audiences []string, clientIDs []string) (*user.User, error) {
 	// The user hasn't provided any information to allow us to parse either
 	// an ID token or a Bearer token.
 	if len(scopes) == 0 && len(audiences) == 0 && len(clientIDs) == 0 {
-		return nil, errors.New("No client ID or scope info provided.")
+		return nil, errors.New("no client ID or scope info provided.")
+	}
+	req := HTTPRequest(c)
+	if req == nil {
+		return nil, errors.New("no request for context (use endpoints.NewContext to create a context)")
 	}
 
-	token := getToken(c.HTTPRequest())
+	token := getToken(req)
 	if token == "" {
 		return nil, errors.New("No token in the current context.")
 	}
@@ -545,7 +556,7 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 	// we dould check if token starts with "ya29." or "1/" to decide that it
 	// is a Bearer token. This is what is done in Java.
 	if len(scopes) == 1 && scopes[0] == EmailScope && len(clientIDs) > 0 {
-		c.Debugf("Checking for ID token.")
+		log.Debugf(c, "Checking for ID token.")
 		now := currentUTC().Unix()
 		u, err := currentIDTokenUser(c, token, audiences, clientIDs, now)
 		// Only return in case of success, else pass along and try
@@ -555,14 +566,14 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 		}
 	}
 
-	c.Debugf("Checking for Bearer token.")
+	log.Debugf(c, "Checking for Bearer token.")
 	return CurrentBearerTokenUser(c, scopes, clientIDs)
 }
 
 func init() {
 	if appengine.IsDevAppServer() {
-		ContextFactory = tokeninfoContextFactory
+		AuthenticatorFactory = tokeninfoAuthenticatorFactory
 	} else {
-		ContextFactory = cachingContextFactory
+		AuthenticatorFactory = cachingAuthenticatorFactory
 	}
 }

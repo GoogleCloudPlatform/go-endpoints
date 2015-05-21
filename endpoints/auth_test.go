@@ -11,9 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"appengine"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/memcache"
+
 	"appengine/aetest"
-	"appengine/memcache"
 )
 
 func TestGetToken(t *testing.T) {
@@ -153,7 +155,7 @@ func TestContains(t *testing.T) {
 func TestGetCachedCertsCacheHit(t *testing.T) {
 	origTransport := httpTransportFactory
 	defer func() { httpTransportFactory = origTransport }()
-	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
+	httpTransportFactory = func(c context.Context) http.RoundTripper {
 		return newTestRoundTripper()
 	}
 
@@ -201,7 +203,7 @@ func TestGetCachedCertsCacheMiss(t *testing.T) {
 	rt := newTestRoundTripper()
 	origTransport := httpTransportFactory
 	defer func() { httpTransportFactory = origTransport }()
-	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
+	httpTransportFactory = func(c context.Context) http.RoundTripper {
 		return rt
 	}
 
@@ -300,7 +302,7 @@ func TestCurrentBearerTokenUser(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create req: %v", err)
 		}
-		c := cachingContextFactory(r)
+		c := newContext(r, cachingAuthenticatorFactory)
 		user, err := CurrentBearerTokenUser(c, tt.scopes, tt.clientIDs)
 		switch {
 		case tt.success && (err != nil || user == nil):
@@ -316,7 +318,7 @@ func TestCurrentBearerTokenUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create req: %v", err)
 	}
-	c := cachingContextFactory(r)
+	c := newContext(r, cachingAuthenticatorFactory)
 
 	scopes := []string{validScope}
 	clientIDs := []string{validClientID}
@@ -402,7 +404,7 @@ func TestCurrentUser(t *testing.T) {
 
 	for i, tt := range tts {
 		r, err := inst.NewRequest("GET", "/", nil)
-		c := cachingContextFactory(r)
+		c := newContext(r, cachingAuthenticatorFactory)
 		if tt.token != "" {
 			r.Header.Set("authorization", "oauth "+tt.token)
 		}
@@ -421,4 +423,12 @@ func TestCurrentUser(t *testing.T) {
 				i, tt.scopes, tt.audiences, tt.clientIDs, user, tt.wantEmail)
 		}
 	}
+}
+
+func newContext(r *http.Request, factory func() Authenticator) context.Context {
+	defer func(old func() Authenticator) {
+		AuthenticatorFactory = old
+	}(AuthenticatorFactory)
+	AuthenticatorFactory = factory
+	return NewContext(r)
 }
