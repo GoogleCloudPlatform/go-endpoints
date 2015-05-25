@@ -291,8 +291,8 @@ GO_APPENGINE_SDK/goapp test -v ./endpoints 2> /dev/null
 
 
 
-[1]: https://developers.google.com/appengine/docs/python/endpoints/
-[2]: https://developers.google.com/appengine/docs/java/endpoints/
+[1]: https://cloud.google.com/appengine/docs/python/endpoints/
+[2]: https://cloud.google.com/appengine/docs/java/endpoints/
 [3]: https://github.com/crhym3/go-tictactoe
 [5]: http://localhost:8080/_ah/api/discovery/v1/apis/greeting/v1/rest
 [6]: http://localhost:8080/_ah/api/explorer
