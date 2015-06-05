@@ -16,9 +16,11 @@ import (
 	"sync"
 	"time"
 
-	"appengine"
-	"appengine/memcache"
-	"appengine/user"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/memcache"
+	"google.golang.org/appengine/user"
 )
 
 const (
@@ -64,10 +66,10 @@ var (
 )
 
 // Context represents the context of an in-flight API request.
-// It embeds appengine.Context so you can use it with any other appengine/*
+// It embeds context.Context so you can use it with any other appengine/*
 // package methods.
 type Context interface {
-	appengine.Context
+	context.Context
 
 	// HTTPRequest returns the request associated with this context.
 	HTTPRequest() *http.Request
@@ -203,10 +205,10 @@ func getCachedCerts(c Context) (*certsList, error) {
 	// to use memcache.
 	var cacheResults = err == memcache.ErrCacheMiss
 	if !cacheResults {
-		c.Debugf(err.Error())
+		log.Debugf(c, err.Error())
 	}
 
-	c.Debugf("Fetching provider certs from: %s", DefaultCertURI)
+	log.Debugf(c, "Fetching provider certs from: %s", DefaultCertURI)
 	resp, err := newHTTPClient(c).Get(DefaultCertURI)
 	if err != nil {
 		return nil, err
@@ -235,7 +237,7 @@ func getCachedCerts(c Context) (*certsList, error) {
 			}
 			err = memcache.Set(namespacedContext, item)
 			if err != nil {
-				c.Errorf("Error adding Certs to memcache: %v", err)
+				log.Errorf(c, "Error adding Certs to memcache: %v", err)
 			}
 		}
 	}
@@ -419,18 +421,18 @@ func verifySignedJWT(c Context, jwt string, now int64) (*signedJWT, error) {
 func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs []string) bool {
 	// Verify the issuer.
 	if token.Issuer != "accounts.google.com" {
-		c.Warningf("Issuer was not valid: %s", token.Issuer)
+		log.Warningf(c, "Issuer was not valid: %s", token.Issuer)
 		return false
 	}
 
 	// Check audiences.
 	if token.Audience == "" {
-		c.Warningf("Invalid aud value in token")
+		log.Warningf(c, "Invalid aud value in token")
 		return false
 	}
 
 	if token.ClientID == "" {
-		c.Warningf("Invalid azp value in token")
+		log.Warningf(c, "Invalid azp value in token")
 		return false
 	}
 
@@ -438,28 +440,28 @@ func verifyParsedToken(c Context, token signedJWT, audiences []string, clientIDs
 	// happens on Android. In the case they are equal, we only need the ClientID to
 	// be in the listed of accepted Client IDs.
 	if token.ClientID != token.Audience && !contains(audiences, token.Audience) {
-		c.Warningf("Audience not allowed: %s", token.Audience)
+		log.Warningf(c, "Audience not allowed: %s", token.Audience)
 		return false
 	}
 
 	// Check allowed client IDs.
 	if len(clientIDs) == 0 {
-		c.Warningf("No allowed client IDs specified. ID token cannot be verified.")
+		log.Warningf(c, "No allowed client IDs specified. ID token cannot be verified.")
 		return false
 	} else if !contains(clientIDs, token.ClientID) {
-		c.Warningf("Client ID is not allowed: %s", token.ClientID)
+		log.Warningf(c, "Client ID is not allowed: %s", token.ClientID)
 		return false
 	}
 
 	if token.Email == "" {
-		c.Warningf("Invalid email value in token")
+		log.Warningf(c, "Invalid email value in token")
 		return false
 	}
 
 	return true
 }
 
-// currentIDTokenUser returns "appengine/user".User object if provided JWT token
+// currentIDTokenUser returns "google.golang.org/appengine/user".User object if provided JWT token
 // was successfully decoded and passed all verifications.
 //
 // Currently, only Email field will be set in case of success.
@@ -499,7 +501,7 @@ func CurrentBearerTokenScope(c Context, scopes []string, clientIDs []string) (st
 		}
 
 		// If none of the client IDs matches, return nil
-		c.Debugf("Couldn't find current client ID %q in %v", currentClientID, clientIDs)
+		log.Debugf(c, "Couldn't find current client ID %q in %v", currentClientID, clientIDs)
 		return "", errors.New("Mismatched Client ID")
 	}
 	// No client ID found for any of the scopes
@@ -545,7 +547,7 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 	// we dould check if token starts with "ya29." or "1/" to decide that it
 	// is a Bearer token. This is what is done in Java.
 	if len(scopes) == 1 && scopes[0] == EmailScope && len(clientIDs) > 0 {
-		c.Debugf("Checking for ID token.")
+		log.Debugf(c, "Checking for ID token.")
 		now := currentUTC().Unix()
 		u, err := currentIDTokenUser(c, token, audiences, clientIDs, now)
 		// Only return in case of success, else pass along and try
@@ -555,7 +557,7 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 		}
 	}
 
-	c.Debugf("Checking for Bearer token.")
+	log.Debugf(c, "Checking for Bearer token.")
 	return CurrentBearerTokenUser(c, scopes, clientIDs)
 }
 

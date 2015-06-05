@@ -12,8 +12,11 @@ import (
 	"net/http"
 	"strings"
 
-	"appengine"
-	"appengine/user"
+	"golang.org/x/net/context"
+
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/user"
 )
 
 const tokeninfoEndpointURL = "https://www.googleapis.com/oauth2/v2/tokeninfo"
@@ -35,13 +38,13 @@ type tokeninfo struct {
 // fetchTokeninfo retrieves token info from tokeninfoEndpointURL  (tokeninfo API)
 func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
 	url := tokeninfoEndpointURL + "?access_token=" + token
-	c.Debugf("Fetching token info from %q", url)
+	log.Debugf(c, "Fetching token info from %q", url)
 	resp, err := newHTTPClient(c).Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	c.Debugf("Tokeninfo replied with %s", resp.Status)
+	log.Debugf(c, "Tokeninfo replied with %s", resp.Status)
 
 	ti := &tokeninfo{}
 	if err = json.NewDecoder(resp.Body).Decode(ti); err != nil {
@@ -89,11 +92,12 @@ func getScopedTokeninfo(c Context, scope string) (*tokeninfo, error) {
 
 // A context that uses tokeninfo API to validate bearer token
 type tokeninfoContext struct {
-	appengine.Context
+	context.Context
+	h *http.Request
 }
 
 func (c *tokeninfoContext) HTTPRequest() *http.Request {
-	return c.Request().(*http.Request)
+	return c.h
 }
 
 // Namespace returns a replacement context that operates within the given namespace.
@@ -102,7 +106,7 @@ func (c *tokeninfoContext) Namespace(name string) (Context, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &tokeninfoContext{nc}, nil
+	return &tokeninfoContext{nc, c.h}, nil
 }
 
 // CurrentOAuthClientID returns a clientID associated with the scope.
@@ -127,5 +131,5 @@ func (c *tokeninfoContext) CurrentOAuthUser(scope string) (*user.User, error) {
 // To be used as auth.go/ContextFactory.
 func tokeninfoContextFactory(r *http.Request) Context {
 	ac := appengine.NewContext(r)
-	return &tokeninfoContext{ac}
+	return &tokeninfoContext{ac, r}
 }

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"appengine"
-	"appengine/memcache"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/memcache"
 )
 
 var jwtValidTokenObject = signedJWT{
