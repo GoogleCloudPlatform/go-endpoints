@@ -2,6 +2,7 @@ package endpoints
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -57,6 +58,29 @@ func (s *ServerTestService) Unauthorized(r *http.Request, req, resp *TestMsg) er
 
 func (s *ServerTestService) Conflict(r *http.Request, req, resp *TestMsg) error {
 	return ConflictError
+}
+
+type RequiredMsg struct {
+	Name string `endpoints:"req"`
+}
+
+func (s *ServerTestService) TestRequired(r *http.Request, req *RequiredMsg) error {
+	return nil
+}
+
+type DefaultMsg struct {
+	Name string `endpoints:"d=gopher"`
+	Age  int    `endpoints:"d=10"`
+}
+
+func (s *ServerTestService) TestDefault(r *http.Request, req *DefaultMsg) error {
+	if req.Name != "gopher" {
+		return fmt.Errorf("wrong default name: %q", req.Name)
+	}
+	if req.Age != 10 {
+		return fmt.Errorf("wrong default age: %v", req.Age)
+	}
+	return nil
 }
 
 // Service methods for args testing
@@ -167,6 +191,10 @@ func TestServerServeHTTP(t *testing.T) {
 		{"PUT", "Void", `{}`, ``, http.StatusBadRequest},
 		{"HEAD", "Void", `{}`, ``, http.StatusBadRequest},
 		{"DELETE", "Void", `{}`, ``, http.StatusBadRequest},
+
+		{"POST", "TestRequired", `{}`, ``, http.StatusBadRequest},
+		{"POST", "TestRequired", `{"name":"francesc"}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{}`, ``, http.StatusOK},
 	}
 
 	for i, tt := range tts {

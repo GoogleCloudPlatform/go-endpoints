@@ -133,6 +133,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := validateRequest(reqValue.Interface()); err != nil {
+		writeError(w, err)
+		return
+	}
+
 	numIn, numOut := methodSpec.method.Type.NumIn(), methodSpec.method.Type.NumOut()
 	// Construct arguments for the method call
 	var httpReqOrCtx interface{} = r
