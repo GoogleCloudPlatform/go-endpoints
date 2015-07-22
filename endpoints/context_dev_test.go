@@ -7,8 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"appengine"
+	"golang.org/x/net/context"
+
 	"appengine/aetest"
+
+	"google.golang.org/appengine/internal"
 
 	basepb "appengine_internal/base"
 )
@@ -49,7 +52,7 @@ func TestTokeninfoContextCurrentOAuthClientID(t *testing.T) {
 	rt := newTestRoundTripper()
 	origTransport := httpTransportFactory
 	defer func() { httpTransportFactory = origTransport }()
-	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
+	httpTransportFactory = func(c context.Context) http.RoundTripper {
 		return rt
 	}
 
@@ -111,7 +114,7 @@ func TestTokeninfoCurrentOAuthUser(t *testing.T) {
 	defer func() {
 		httpTransportFactory = origTransport
 	}()
-	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
+	httpTransportFactory = func(c context.Context) http.RoundTripper {
 		return newTestRoundTripper(&http.Response{
 			Status:     "200 OK",
 			StatusCode: 200,
@@ -146,7 +149,8 @@ func TestTokeinfoContextNamespace(t *testing.T) {
 		t.Fatalf("Namespace(%q) = %v", namespace, err)
 	}
 	ns := &basepb.StringProto{}
-	if err := nc.Call("__go__", "GetNamespace", &basepb.VoidProto{}, ns, nil); err != nil {
+
+	if err := internal.Call(nc, "__go__", "GetNamespace", &basepb.VoidProto{}, ns); err != nil {
 		t.Fatalf("error calling __go__.GetNamespace: %v", err)
 	}
 	if ns.GetValue() != namespace {

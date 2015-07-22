@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+
+	"google.golang.org/appengine/log"
 	// Mainly for debug logging
 	"io/ioutil"
 )
@@ -122,7 +124,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	c.Debugf("SPI request body: %s", body)
+	log.Debugf(c, "SPI request body: %s", body)
 
 	// if err := json.NewDecoder(r.Body).Decode(req.Interface()); err != nil {
 	// 	writeError(w, fmt.Errorf("Error while decoding JSON: %q", err))

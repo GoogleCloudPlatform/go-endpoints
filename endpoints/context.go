@@ -24,14 +24,17 @@ import (
 	"net/http"
 	"sync"
 
-	"appengine"
-	"appengine/user"
+	"golang.org/x/net/context"
 
-	pb "appengine_internal/user"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/internal"
+	"google.golang.org/appengine/user"
+
+	pb "google.golang.org/appengine/internal/user"
 )
 
 type cachingContext struct {
-	appengine.Context
+	context.Context
 	r *http.Request
 	// map keys are scopes
 	oauthResponseCache map[string]*pb.GetOAuthUserResponse
@@ -48,7 +51,8 @@ func populateOAuthResponse(c *cachingContext, scope string) error {
 	req := &pb.GetOAuthUserRequest{Scope: &scope}
 	res := &pb.GetOAuthUserResponse{}
 
-	err := c.Call("user", "GetOAuthUser", req, res, nil)
+	err := internal.Call(c, "user", "GetOAuthUser", req, res)
+
 	if err != nil {
 		return err
 	}
@@ -113,7 +117,7 @@ func (c *cachingContext) CurrentOAuthUser(scope string) (*user.User, error) {
 	}, nil
 }
 
-func newCachingContext(c appengine.Context, r *http.Request) Context {
+func newCachingContext(c context.Context, r *http.Request) Context {
 	return &cachingContext{c, r, map[string]*pb.GetOAuthUserResponse{}, sync.Mutex{}}
 }
 

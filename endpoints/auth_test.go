@@ -11,9 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"appengine"
+	"golang.org/x/net/context"
+
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/memcache"
+
 	"appengine/aetest"
-	"appengine/memcache"
 )
 
 func TestGetToken(t *testing.T) {
@@ -153,7 +156,7 @@ func TestContains(t *testing.T) {
 func TestGetCachedCertsCacheHit(t *testing.T) {
 	origTransport := httpTransportFactory
 	defer func() { httpTransportFactory = origTransport }()
-	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
+	httpTransportFactory = func(c context.Context) http.RoundTripper {
 		return newTestRoundTripper()
 	}
 
@@ -201,7 +204,7 @@ func TestGetCachedCertsCacheMiss(t *testing.T) {
 	rt := newTestRoundTripper()
 	origTransport := httpTransportFactory
 	defer func() { httpTransportFactory = origTransport }()
-	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
+	httpTransportFactory = func(c context.Context) http.RoundTripper {
 		return rt
 	}
 

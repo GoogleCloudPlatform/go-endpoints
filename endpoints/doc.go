@@ -124,7 +124,7 @@ where ListReq and ItemsList are defined as follows:
 What's interesting here is ListReq.Page and ItemsList.Next fields which are
 of type QueryMarker:
 
-	import "appengine/datastore"
+	import "google.golang.org/appengine/datastore"
 
 	type QueryMarker struct {
 	    datastore.Cursor
@@ -357,7 +357,7 @@ Or play it on the live demo app at https://go-endpoints.appspot.com/tictactoe
 Running tests
 
 We currently use aet tool (https://github.com/crhym3/aegot) to simplify running
-tests on files that have "appengine" or "appengine_internal" imports.
+tests on files that have "google.golang.org/appengine" or "google.golang.org/appengine_internal" imports.
 
 Check out the readme of that tool but, assuming you cloned this repo
 (so you can reach ./endpoints dir), the initial setup process is pretty simple:
