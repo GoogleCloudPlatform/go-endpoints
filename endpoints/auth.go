@@ -54,7 +54,7 @@ var (
 		return time.Now().UTC()
 	}
 
-	// AuthenticatorFactory creates a new authenticator.
+	// AuthenticatorFactory creates a new Authenticator.
 	//
 	// It is a variable on purpose. You can set it to a stub implementation
 	// in tests.
@@ -78,7 +78,8 @@ type contextKey int
 
 // Context value keys.
 const (
-	requestKey contextKey = iota
+	invalidKey contextKey = iota
+	requestKey
 	authenticatorKey
 )
 
@@ -88,32 +89,35 @@ func HTTPRequest(c context.Context) *http.Request {
 	return r
 }
 
-// contextAuthenticator returns the authenticator associated with a
-// context, or an error if there is not one.
-func contextAuthenticator(c context.Context) (Authenticator, error) {
-	a, ok := c.Value(authenticatorKey).(Authenticator)
-	if !ok {
-		return nil, errors.New("context has no authenticator (use endpoints.NewContext to create a context)")
-	}
-	return a, nil
+// authenticator returns the Authenticator associated with a
+// context, or nil if there is not one.
+func authenticator(c context.Context) Authenticator {
+	a, _ := c.Value(authenticatorKey).(Authenticator)
+	return a
 }
 
+// Errors for incorrect contexts.
+var (
+	errNoAuthenticator = errors.New("context has no authenticator (use endpoints.NewContext to create a context)")
+	errNoRequest       = errors.New("no request for context (use endpoints.NewContext to create a context)")
+)
+
 // NewContext returns a new context for an in-flight API (HTTP) request.
-func NewContext(req *http.Request) context.Context {
-	c := appengine.NewContext(req)
-	c = context.WithValue(c, requestKey, req)
+func NewContext(r *http.Request) context.Context {
+	c := appengine.NewContext(r)
+	c = context.WithValue(c, requestKey, r)
 	c = context.WithValue(c, authenticatorKey, AuthenticatorFactory())
 	return c
 }
 
-// getToken looks for Authorization header and returns a token.
+// parseToken looks for Authorization header and returns a token.
 //
 // Returns empty string if req does not contain authorization header
 // or its value is not prefixed with allowedAuthSchemesUpper.
-func getToken(req *http.Request) string {
+func parseToken(r *http.Request) string {
 	// TODO(dhermes): Allow a struct with access_token and bearer_token
 	//                fields here as well.
-	pieces := strings.Fields(req.Header.Get("Authorization"))
+	pieces := strings.Fields(r.Header.Get("Authorization"))
 	if len(pieces) != 2 {
 		return ""
 	}
@@ -137,8 +141,8 @@ type certsList struct {
 	KeyValues []*certInfo `json:"keyvalues"`
 }
 
-// getMaxAge parses Cache-Control header value and extracts max-age (in seconds)
-func getMaxAge(s string) int {
+// maxAge parses Cache-Control header value and extracts max-age (in seconds)
+func maxAge(s string) int {
 	match := maxAgePattern.FindStringSubmatch(s)
 	if len(match) != 2 {
 		return 0
@@ -149,23 +153,23 @@ func getMaxAge(s string) int {
 	return 0
 }
 
-// getCertExpirationTime computes a cert freshness based on Cache-Control
+// certExpirationTime computes a cert freshness based on Cache-Control
 // and Age headers of h.
 //
 // Returns 0 if one of the required headers is not present or cert lifetime
 // is expired.
-func getCertExpirationTime(h http.Header) time.Duration {
+func certExpirationTime(h http.Header) time.Duration {
 	// http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2 indicates only
 	// a comma-separated header is valid, so it should be fine to split this on
 	// commas.
-	var maxAge int
+	var max int
 	for _, entry := range strings.Split(h.Get("Cache-Control"), ",") {
-		maxAge = getMaxAge(entry)
-		if maxAge > 0 {
+		max = maxAge(entry)
+		if max > 0 {
 			break
 		}
 	}
-	if maxAge <= 0 {
+	if max <= 0 {
 		return 0
 	}
 
@@ -174,7 +178,7 @@ func getCertExpirationTime(h http.Header) time.Duration {
 		return 0
 	}
 
-	remainingTime := maxAge - age
+	remainingTime := max - age
 	if remainingTime <= 0 {
 		return 0
 	}
@@ -182,9 +186,9 @@ func getCertExpirationTime(h http.Header) time.Duration {
 	return time.Duration(remainingTime) * time.Second
 }
 
-// getCachedCerts fetches public certificates info from DefaultCertURI and
+// cachedCerts fetches public certificates info from DefaultCertURI and
 // caches it for the duration specified in Age header of a response.
-func getCachedCerts(c context.Context) (*certsList, error) {
+func cachedCerts(c context.Context) (*certsList, error) {
 	namespacedContext, err := appengine.Namespace(c, certNamespace)
 	if err != nil {
 		return nil, err
@@ -225,7 +229,7 @@ func getCachedCerts(c context.Context) (*certsList, error) {
 	}
 
 	if cacheResults {
-		expiration := getCertExpirationTime(resp.Header)
+		expiration := certExpirationTime(resp.Header)
 		if expiration > 0 {
 			item := &memcache.Item{
 				Key:        DefaultCertURI,
@@ -339,7 +343,7 @@ func verifySignedJWT(c context.Context, jwt string, now int64) (*signedJWT, erro
 	}
 
 	// Get current certs
-	certs, err := getCachedCerts(c)
+	certs, err := cachedCerts(c)
 	if err != nil {
 		return nil, err
 	}
@@ -485,9 +489,9 @@ func currentIDTokenUser(c context.Context, jwt string, audiences []string, clien
 //   - it is found in Context c
 //   - client ID on that scope matches one of clientIDs in the args
 func CurrentBearerTokenScope(c context.Context, scopes []string, clientIDs []string) (string, error) {
-	auth, err := contextAuthenticator(c)
-	if err != nil {
-		return "", err
+	auth := authenticator(c)
+	if auth == nil {
+		return "", errNoAuthenticator
 	}
 	for _, scope := range scopes {
 		currentClientID, err := auth.CurrentOAuthClientID(c, scope)
@@ -518,9 +522,9 @@ func CurrentBearerTokenScope(c context.Context, scopes []string, clientIDs []str
 // clientIDs are allowed to make requests, or user did not authorize any of
 // the scopes.
 func CurrentBearerTokenUser(c context.Context, scopes []string, clientIDs []string) (*user.User, error) {
-	auth, err := contextAuthenticator(c)
-	if err != nil {
-		return nil, err
+	auth := authenticator(c)
+	if auth == nil {
+		return nil, errNoAuthenticator
 	}
 	scope, err := CurrentBearerTokenScope(c, scopes, clientIDs)
 	if err != nil {
@@ -542,12 +546,12 @@ func CurrentUser(c context.Context, scopes []string, audiences []string, clientI
 	if len(scopes) == 0 && len(audiences) == 0 && len(clientIDs) == 0 {
 		return nil, errors.New("no client ID or scope info provided.")
 	}
-	req := HTTPRequest(c)
-	if req == nil {
-		return nil, errors.New("no request for context (use endpoints.NewContext to create a context)")
+	r := HTTPRequest(c)
+	if r == nil {
+		return nil, errNoRequest
 	}
 
-	token := getToken(req)
+	token := parseToken(r)
 	if token == "" {
 		return nil, errors.New("No token in the current context.")
 	}

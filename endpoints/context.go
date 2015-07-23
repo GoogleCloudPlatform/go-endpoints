@@ -55,7 +55,7 @@ func (ca *cachingAuthenticator) populateOAuthResponse(c context.Context, scope s
 	return nil
 }
 
-func (ca *cachingAuthenticator) getOAuthResponse(c context.Context, scope string) (*pb.GetOAuthUserResponse, error) {
+func (ca *cachingAuthenticator) oauthResponse(c context.Context, scope string) (*pb.GetOAuthUserResponse, error) {
 	ca.Lock()
 	defer ca.Unlock()
 
@@ -71,7 +71,7 @@ func (ca *cachingAuthenticator) getOAuthResponse(c context.Context, scope string
 
 // CurrentOAuthClientID returns a clientID associated with the scope.
 func (ca *cachingAuthenticator) CurrentOAuthClientID(c context.Context, scope string) (string, error) {
-	res, err := ca.getOAuthResponse(c, scope)
+	res, err := ca.oauthResponse(c, scope)
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +83,7 @@ func (ca *cachingAuthenticator) CurrentOAuthClientID(c context.Context, scope st
 //
 // Returns an error if data for this scope is not available.
 func (ca *cachingAuthenticator) CurrentOAuthUser(c context.Context, scope string) (*user.User, error) {
-	res, err := ca.getOAuthResponse(c, scope)
+	res, err := ca.oauthResponse(c, scope)
 	if err != nil {
 		return nil, err
 	}

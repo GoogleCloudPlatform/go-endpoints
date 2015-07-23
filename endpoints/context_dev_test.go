@@ -90,8 +90,8 @@ func TestTokeninfoContextCurrentOAuthClientID(t *testing.T) {
 			})
 		}
 		c := newContext(r, tokeninfoAuthenticatorFactory)
-		auth, err := contextAuthenticator(c)
-		if err != nil {
+		auth := authenticator(c)
+		if auth == nil {
 			t.Errorf("%d: context authenticator missing", i)
 			continue
 		}
@@ -129,8 +129,8 @@ func TestTokeninfoCurrentOAuthUser(t *testing.T) {
 
 	const scope = "scope.one"
 	c := newContext(r, tokeninfoAuthenticatorFactory)
-	auth, err := contextAuthenticator(c)
-	if err != nil {
+	auth := authenticator(c)
+	if auth == nil {
 		t.Fatal("context authenticator missing")
 	}
 	user, err := auth.CurrentOAuthUser(c, scope)

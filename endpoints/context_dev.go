@@ -68,10 +68,10 @@ func fetchTokeninfo(c context.Context, token string) (*tokeninfo, error) {
 	return ti, err
 }
 
-// getScopedTokeninfo validates fetched token by matching tokeninfo.Scope
+// scopedTokeninfo validates fetched token by matching tokeninfo.Scope
 // with scope arg.
-func getScopedTokeninfo(c context.Context, scope string) (*tokeninfo, error) {
-	token := getToken(HTTPRequest(c))
+func scopedTokeninfo(c context.Context, scope string) (*tokeninfo, error) {
+	token := parseToken(HTTPRequest(c))
 	if token == "" {
 		return nil, errors.New("No token found")
 	}
@@ -88,13 +88,13 @@ func getScopedTokeninfo(c context.Context, scope string) (*tokeninfo, error) {
 		ti.Scope, scope)
 }
 
-// tokeninfoAuthenticator is an authenticator that uses tokeninfo API
+// tokeninfoAuthenticator is an Authenticator that uses tokeninfo API
 // to validate bearer token.
 type tokeninfoAuthenticator struct{}
 
 // CurrentOAuthClientID returns a clientID associated with the scope.
-func (*tokeninfoAuthenticator) CurrentOAuthClientID(c context.Context, scope string) (string, error) {
-	ti, err := getScopedTokeninfo(c, scope)
+func (tokeninfoAuthenticator) CurrentOAuthClientID(c context.Context, scope string) (string, error) {
+	ti, err := scopedTokeninfo(c, scope)
 	if err != nil {
 		return "", err
 	}
@@ -102,8 +102,8 @@ func (*tokeninfoAuthenticator) CurrentOAuthClientID(c context.Context, scope str
 }
 
 // CurrentOAuthUser returns a user associated with the request in context.
-func (*tokeninfoAuthenticator) CurrentOAuthUser(c context.Context, scope string) (*user.User, error) {
-	ti, err := getScopedTokeninfo(c, scope)
+func (tokeninfoAuthenticator) CurrentOAuthUser(c context.Context, scope string) (*user.User, error) {
+	ti, err := scopedTokeninfo(c, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -113,5 +113,5 @@ func (*tokeninfoAuthenticator) CurrentOAuthUser(c context.Context, scope string)
 // tokeninfoAuthenticatorFactory creates a new tokeninfoAuthenticator from r.
 // To be used as auth.go/AuthenticatorFactory.
 func tokeninfoAuthenticatorFactory() Authenticator {
-	return new(tokeninfoAuthenticator)
+	return tokeninfoAuthenticator{}
 }
