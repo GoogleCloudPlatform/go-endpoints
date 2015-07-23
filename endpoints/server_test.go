@@ -266,3 +266,26 @@ func TestServerRegisterService(t *testing.T) {
 		}
 	}
 }
+
+func TestServerMustRegisterService(t *testing.T) {
+	s := NewServer("")
+
+	var panicked interface{}
+	func() {
+		defer func() { panicked = recover() }()
+		Must(s.RegisterService(
+			&ServerTestService{}, "ServerTestService", "v1", "", true))
+	}()
+	if panicked != nil {
+		t.Fatalf("unexpected panic: %v", panicked)
+	}
+
+	type badService struct{}
+	func() {
+		defer func() { panicked = recover() }()
+		Must(s.RegisterService(&badService{}, "BadService", "v1", "", true))
+	}()
+	if panicked == nil {
+		t.Fatalf("expected panic didn't occur")
+	}
+}
