@@ -67,6 +67,18 @@ func (s *Server) RegisterServiceWithDefaults(srv interface{}) (*RPCService, erro
 	return s.RegisterService(srv, "", "", "", true)
 }
 
+// Must is a helper that wraps a call to a function returning (*Template, error) and
+// panics if the error is non-nil. It is intended for use in variable initializations
+// such as:
+// 	var s = endpoints.Must(endpoints.RegisterService(s, "Service", "v1", "some service", true))
+//
+func Must(s *RPCService, err error) *RPCService {
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 // ServiceByName returns a registered service or nil if there's no service
 // registered by that name.
 func (s *Server) ServiceByName(serviceName string) *RPCService {
