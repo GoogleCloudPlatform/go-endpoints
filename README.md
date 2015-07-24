@@ -239,9 +239,10 @@ cd discovery_api_dart_client_generator
 pub install
 
 # Generate your client library:
+mkdir input
 URL='https://my-app-id.appspot.com/_ah/api/discovery/v1/apis/greeting/v1/rest'
-curl -s -o greetings.rpc.discovery $URL
-bin/generate.dart --no-prefix -i greetings.rpc.discovery -o ../
+curl -s -o input/greeting.json $URL
+bin/generate.dart package -i input -o ../dart_my-app-id_v1_api_client --package-name my-app-id_v1_api
 ```
 
 Now you just have to add your endpoints client library to your dart application (assuming it is in the parent directory.)

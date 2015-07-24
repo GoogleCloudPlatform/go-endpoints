@@ -6,6 +6,7 @@
 package endpoints
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -117,6 +118,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqValue := reflect.New(methodSpec.ReqType)
 
 	body, err := ioutil.ReadAll(r.Body)
+	r.Body.Close()
 	if err != nil {
 		writeError(w, err)
 		return
@@ -131,6 +133,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+
+	// Restore the body in the original request.
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
 
 	numIn, numOut := methodSpec.method.Type.NumIn(), methodSpec.method.Type.NumOut()
 	// Construct arguments for the method call
