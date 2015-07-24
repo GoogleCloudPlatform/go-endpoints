@@ -776,50 +776,14 @@ func validateField(v reflect.Value, t reflect.StructField) error {
 		return fmt.Errorf("missing field %q", t.Name)
 	}
 
-	if tag.defaultVal != "" && isZero {
-		setDefault(v, tag.defaultVal)
-	}
-
-	return nil
-}
-
-func setDefault(v reflect.Value, d string) error {
-	if v.Interface() != reflect.Zero(v.Type()).Interface() {
+	if tag.defaultVal == "" || !isZero {
 		return nil
 	}
 
-	switch v.Interface().(type) {
-	case string:
-		v.Set(reflect.ValueOf(d))
-	case bool:
-		switch d {
-		case "true":
-			v.Set(reflect.ValueOf(true))
-		case "false":
-			v.Set(reflect.ValueOf(false))
-		default:
-			return fmt.Errorf("unsupported bool %q", d)
-		}
-	case int, int8, int16, int32, int64:
-		p, err := strconv.ParseInt(d, 10, 64)
-		if err != nil {
-			return err
-		}
-		v.Set(reflect.ValueOf(p).Convert(v.Type()))
-	case uint, uint8, uint16, uint32, uint64, uintptr:
-		p, err := strconv.ParseUint(d, 10, 64)
-		if err != nil {
-			return err
-		}
-		v.Set(reflect.ValueOf(p).Convert(v.Type()))
-	case float32, float64:
-		p, err := strconv.ParseFloat(d, 64)
-		if err != nil {
-			return err
-		}
-		v.Set(reflect.ValueOf(p).Convert(v.Type()))
-	default:
-		return fmt.Errorf("unsupported type %T", v.Interface())
+	r, err := parseValue(tag.defaultVal, v.Kind())
+	if err != nil {
+		return err
 	}
+	v.Set(reflect.ValueOf(r))
 	return nil
 }

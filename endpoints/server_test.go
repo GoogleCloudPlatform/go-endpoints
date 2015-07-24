@@ -1,9 +1,11 @@
 package endpoints
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -15,6 +17,10 @@ import (
 
 type TestMsg struct {
 	Name string `json:"name"`
+}
+
+type BytesMsg struct {
+	Bytes []byte
 }
 
 type ServerTestService struct{}
@@ -69,16 +75,29 @@ func (s *ServerTestService) TestRequired(r *http.Request, req *RequiredMsg) erro
 }
 
 type DefaultMsg struct {
-	Name string `endpoints:"d=gopher"`
-	Age  int    `endpoints:"d=10"`
+	Name   string  `endpoints:"d=gopher"`
+	Age    int     `endpoints:"d=10"`
+	Weight float64 `endpoints:"d=0.5"`
 }
 
 func (s *ServerTestService) TestDefault(r *http.Request, req *DefaultMsg) error {
-	if req.Name != "gopher" {
-		return fmt.Errorf("wrong default name: %q", req.Name)
+	var sent *DefaultMsg
+	if err := json.NewDecoder(r.Body).Decode(&sent); err != nil {
+		return fmt.Errorf("decoding original message: %v", err)
 	}
-	if req.Age != 10 {
-		return fmt.Errorf("wrong default age: %v", req.Age)
+
+	// check that rcv is a good value given sent and default values.
+	check := func(sent, z, rcv, def interface{}) bool {
+		return (sent == z && rcv == def) || (sent != z && sent == rcv)
+	}
+	if !check(sent.Name, "", req.Name, "gopher") {
+		return fmt.Errorf("wrong name: %q", req.Name)
+	}
+	if !check(sent.Age, 0, req.Age, 10) {
+		return fmt.Errorf("wrong age: %v", req.Age)
+	}
+	if !check(sent.Weight, 0.0, req.Weight, 0.5) {
+		return fmt.Errorf("wrong weight: %v", req.Weight)
 	}
 	return nil
 }
@@ -127,6 +146,15 @@ func (s *ServerTestService) MsgWithoutRequestNorResponse(c Context) error {
 		return errors.New("MsgWithoutRequestNorResponse: c = nil")
 	}
 	return nil
+}
+
+func (s *ServerTestService) EchoRequest(r *http.Request, req *TestMsg) (*BytesMsg, error) {
+	b, err := ioutil.ReadAll(r.Body)
+	r.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	return &BytesMsg{b}, nil
 }
 
 func createAPIServer() *Server {
@@ -195,6 +223,10 @@ func TestServerServeHTTP(t *testing.T) {
 		{"POST", "TestRequired", `{}`, ``, http.StatusBadRequest},
 		{"POST", "TestRequired", `{"name":"francesc"}`, ``, http.StatusOK},
 		{"POST", "TestDefault", `{}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"name":"francesc"}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"age": 20}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"weight": 3.14}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"name":"francesc", "age": 20}`, ``, http.StatusOK},
 	}
 
 	for i, tt := range tts {
@@ -292,5 +324,33 @@ func TestServerRegisterService(t *testing.T) {
 		if m.wantsContext != tt.wantsContext {
 			t.Errorf("%d: wantsContext = %v; want %v", i, m.wantsContext, tt.wantsContext)
 		}
+	}
+}
+
+func TestServerRequestNotEmpty(t *testing.T) {
+	server := createAPIServer()
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatalf("failed to create instance: %v", err)
+	}
+	defer inst.Close()
+
+	path := "/ServerTestService.EchoRequest"
+	body := `{"name": "francesc"}`
+	r, err := inst.NewRequest("POST", path, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("failed to create req: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	server.ServeHTTP(w, r)
+
+	var res BytesMsg
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("decode response %q: %v", w.Body.String(), err)
+	}
+
+	if string(res.Bytes) != body {
+		t.Fatalf("expected %q; got %q", body, res)
 	}
 }
