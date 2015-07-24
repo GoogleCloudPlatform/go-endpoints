@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -561,8 +560,7 @@ func CurrentUser(c Context, scopes []string, audiences []string, clientIDs []str
 }
 
 func init() {
-	// TODO(jbd): Replace it with appengine.IsDevAppServer when it's implemented.
-	if os.Getenv("RUN_WITH_DEVAPPSERVER") != "" {
+	if appengine.IsDevAppServer() {
 		ContextFactory = tokeninfoContextFactory
 	} else {
 		ContextFactory = cachingContextFactory
