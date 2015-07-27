@@ -11,12 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"appengine"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/memcache"
+
 	"appengine/aetest"
-	"appengine/memcache"
 )
 
-func TestGetToken(t *testing.T) {
+func TestParseToken(t *testing.T) {
 	tts := []struct {
 		header, value, want string
 	}{
@@ -39,29 +41,29 @@ func TestGetToken(t *testing.T) {
 		}
 		r := &http.Request{Header: h}
 
-		out := getToken(r)
+		out := parseToken(r)
 		if out != tt.want {
-			t.Errorf("%d: getToken(%v) = %q; want %q", i, h, out, tt.want)
+			t.Errorf("%d: parseToken(%v) = %q; want %q", i, h, out, tt.want)
 		}
 	}
 }
 
-func TestGetMaxAge(t *testing.T) {
+func TestMaxAge(t *testing.T) {
 	verifyPairs(t,
-		getMaxAge("max-age=86400"), 86400,
-		getMaxAge("max-age = 7200, must-revalidate"), 7200,
-		getMaxAge("public, max-age= 3600"), 3600,
-		getMaxAge("max-age=-100"), 0,
-		getMaxAge("max-age = 0a1b, must-revalidate"), 0,
-		getMaxAge("public, max-age= short"), 0,
-		getMaxAge("s-maxage=86400"), 0,
-		getMaxAge("max=86400"), 0,
-		getMaxAge("public"), 0,
-		getMaxAge(""), 0,
+		maxAge("max-age=86400"), 86400,
+		maxAge("max-age = 7200, must-revalidate"), 7200,
+		maxAge("public, max-age= 3600"), 3600,
+		maxAge("max-age=-100"), 0,
+		maxAge("max-age = 0a1b, must-revalidate"), 0,
+		maxAge("public, max-age= short"), 0,
+		maxAge("s-maxage=86400"), 0,
+		maxAge("max=86400"), 0,
+		maxAge("public"), 0,
+		maxAge(""), 0,
 	)
 }
 
-func TestGetCertExpirationTime(t *testing.T) {
+func TestCertExpirationTime(t *testing.T) {
 	tts := []struct {
 		cacheControl, age string
 		want              time.Duration
@@ -79,8 +81,8 @@ func TestGetCertExpirationTime(t *testing.T) {
 		h.Set("cache-control", tt.cacheControl)
 		h.Set("age", tt.age)
 
-		if out := getCertExpirationTime(h); out != tt.want {
-			t.Errorf("%d: getCertExpirationTime(%v) = %d; want %d", i, h, out, tt.want)
+		if out := certExpirationTime(h); out != tt.want {
+			t.Errorf("%d: certExpirationTime(%v) = %d; want %d", i, h, out, tt.want)
 		}
 	}
 }
@@ -150,10 +152,10 @@ func TestContains(t *testing.T) {
 	}
 }
 
-func TestGetCachedCertsCacheHit(t *testing.T) {
+func TestCachedCertsCacheHit(t *testing.T) {
 	origTransport := httpTransportFactory
 	defer func() { httpTransportFactory = origTransport }()
-	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
+	httpTransportFactory = func(c context.Context) http.RoundTripper {
 		return newTestRoundTripper()
 	}
 
@@ -184,24 +186,24 @@ func TestGetCachedCertsCacheHit(t *testing.T) {
 		if err := memcache.Set(nc, item); err != nil {
 			t.Fatal(err)
 		}
-		out, err := getCachedCerts(ec)
+		out, err := cachedCerts(ec)
 		switch {
 		case err != nil && tt.want != nil:
-			t.Errorf("%d: getCachedCerts() error %v", i, err)
+			t.Errorf("%d: cachedCerts() error %v", i, err)
 		case err == nil && tt.want == nil:
-			t.Errorf("%d: getCachedCerts() = %#v; want error", i, out)
+			t.Errorf("%d: cachedCerts() = %#v; want error", i, out)
 		case err == nil && tt.want != nil && !reflect.DeepEqual(out, tt.want):
-			t.Errorf("getCachedCerts() = %#+v (%T); want %#+v (%T)",
+			t.Errorf("cachedCerts() = %#+v (%T); want %#+v (%T)",
 				out, out, tt.want, tt.want)
 		}
 	}
 }
 
-func TestGetCachedCertsCacheMiss(t *testing.T) {
+func TestCachedCertsCacheMiss(t *testing.T) {
 	rt := newTestRoundTripper()
 	origTransport := httpTransportFactory
 	defer func() { httpTransportFactory = origTransport }()
-	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
+	httpTransportFactory = func(c context.Context) http.RoundTripper {
 		return rt
 	}
 
@@ -239,15 +241,15 @@ func TestGetCachedCertsCacheMiss(t *testing.T) {
 		}
 		memcache.Delete(nc, DefaultCertURI)
 
-		out, err := getCachedCerts(ec)
+		out, err := cachedCerts(ec)
 		switch {
 		case err != nil && tt.want != nil:
-			t.Errorf("%d: getCachedCerts() = %v", i, err)
+			t.Errorf("%d: cachedCerts() = %v", i, err)
 		case err == nil && tt.want == nil:
-			t.Errorf("%d: getCachedCerts() = %#v; want error", i, out)
+			t.Errorf("%d: cachedCerts() = %#v; want error", i, out)
 		default:
 			if !reflect.DeepEqual(out, tt.want) {
-				t.Errorf("%d: getCachedCerts() = %#v; want %#v", i, out, tt.want)
+				t.Errorf("%d: cachedCerts() = %#v; want %#v", i, out, tt.want)
 			}
 			if !tt.shouldCache {
 				continue
@@ -300,7 +302,7 @@ func TestCurrentBearerTokenUser(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create req: %v", err)
 		}
-		c := cachingContextFactory(r)
+		c := newContext(r, cachingAuthenticatorFactory)
 		user, err := CurrentBearerTokenUser(c, tt.scopes, tt.clientIDs)
 		switch {
 		case tt.success && (err != nil || user == nil):
@@ -316,7 +318,7 @@ func TestCurrentBearerTokenUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create req: %v", err)
 	}
-	c := cachingContextFactory(r)
+	c := newContext(r, cachingAuthenticatorFactory)
 
 	scopes := []string{validScope}
 	clientIDs := []string{validClientID}
@@ -402,7 +404,7 @@ func TestCurrentUser(t *testing.T) {
 
 	for i, tt := range tts {
 		r, err := inst.NewRequest("GET", "/", nil)
-		c := cachingContextFactory(r)
+		c := newContext(r, cachingAuthenticatorFactory)
 		if tt.token != "" {
 			r.Header.Set("authorization", "oauth "+tt.token)
 		}
@@ -421,4 +423,12 @@ func TestCurrentUser(t *testing.T) {
 				i, tt.scopes, tt.audiences, tt.clientIDs, user, tt.wantEmail)
 		}
 	}
+}
+
+func newContext(r *http.Request, factory func() Authenticator) context.Context {
+	defer func(old func() Authenticator) {
+		AuthenticatorFactory = old
+	}(AuthenticatorFactory)
+	AuthenticatorFactory = factory
+	return NewContext(r)
 }
