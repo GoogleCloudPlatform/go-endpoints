@@ -769,17 +769,15 @@ func validateField(v reflect.Value, t reflect.StructField) error {
 	if err != nil {
 		return fmt.Errorf("parse tag: %v", err)
 	}
-	zero := reflect.Zero(v.Type()).Interface()
-	isZero := v.Interface() == zero
-
-	if tag.required && isZero {
-		return fmt.Errorf("missing field %q", t.Name)
-	}
-
-	if tag.defaultVal == "" || !isZero {
+	if v.Interface() != reflect.Zero(v.Type()).Interface() {
 		return nil
 	}
-
+	if tag.required {
+		return fmt.Errorf("missing field %q", t.Name)
+	}
+	if tag.defaultVal == "" {
+		return nil
+	}
 	r, err := parseValue(tag.defaultVal, v.Kind())
 	if err != nil {
 		return err
