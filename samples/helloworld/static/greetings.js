@@ -14,17 +14,19 @@
 
 function GreetingsCtrl($scope, $http) {
   $scope.greetings = [];
-  var button = document.getElementsByTagName('button')[0];
+  $scope.running = true;
   var api;
  
   loadAPI(function() {
     api = gapi.client.greetings;
+    // load the messages now and refresh every second after.
     $scope.refresh();
- });
+    window.setInterval($scope.refresh, 1000);
+  });
 
   $scope.refresh = function() {
     api.list({'limit':100}).execute(function(res) {
-      button.disabled = false;
+      $scope.running = false;
       $scope.greetings = res.result.items;
       $scope.$apply();
    });
@@ -32,15 +34,15 @@ function GreetingsCtrl($scope, $http) {
 
  // Load the greetings API
   $scope.add = function() {
-    button.disabled = true;
+    $scope.running = true;
     api.add($scope.msg).execute(function(res) {
-      // wait one second to avoid issues with eventual consistency.
-      $scope.msg.content = '';
-      setTimeout($scope.refresh, 1000);
-    });
+      $scope.greetings.unshift($scope.msg);
+      $scope.msg = {'author': $scope.msg.author};
+      $scope.running = false;
+      $scope.$apply();
+  });
   };
 }
-
 
 function loadAPI(then) {
   var script = document.createElement('script');

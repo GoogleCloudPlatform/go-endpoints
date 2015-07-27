@@ -40,7 +40,7 @@ limitations under the License.
   <form>
     <input type='text' placeholder='your name' ng-model='msg.author'>
     <input type='text' placeholder='your message' ng-model='msg.content'>
-    <button disabled ng-click='add()'>Add</button>
+    <button ng-disabled='running' ng-click='add()'>Add</button>
   </form>
 
 </body>
