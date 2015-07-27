@@ -1,4 +1,4 @@
-// This implementation of Authenticator uses tokeninfo API to validate
+// This implementation of Context interface uses tokeninfo API to validate
 // bearer token.
 //
 // It is intended to be used only on dev server.
@@ -12,9 +12,8 @@ import (
 	"net/http"
 	"strings"
 
-	"golang.org/x/net/context"
-	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/user"
+	"appengine"
+	"appengine/user"
 )
 
 const tokeninfoEndpointURL = "https://www.googleapis.com/oauth2/v2/tokeninfo"
@@ -34,15 +33,15 @@ type tokeninfo struct {
 }
 
 // fetchTokeninfo retrieves token info from tokeninfoEndpointURL  (tokeninfo API)
-func fetchTokeninfo(c context.Context, token string) (*tokeninfo, error) {
+func fetchTokeninfo(c Context, token string) (*tokeninfo, error) {
 	url := tokeninfoEndpointURL + "?access_token=" + token
-	log.Debugf(c, "Fetching token info from %q", url)
+	c.Debugf("Fetching token info from %q", url)
 	resp, err := newHTTPClient(c).Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	log.Debugf(c, "Tokeninfo replied with %s", resp.Status)
+	c.Debugf("Tokeninfo replied with %s", resp.Status)
 
 	ti := &tokeninfo{}
 	if err = json.NewDecoder(resp.Body).Decode(ti); err != nil {
@@ -68,10 +67,10 @@ func fetchTokeninfo(c context.Context, token string) (*tokeninfo, error) {
 	return ti, err
 }
 
-// scopedTokeninfo validates fetched token by matching tokeninfo.Scope
+// getScopedTokeninfo validates fetched token by matching tokeinfo.Scope
 // with scope arg.
-func scopedTokeninfo(c context.Context, scope string) (*tokeninfo, error) {
-	token := parseToken(HTTPRequest(c))
+func getScopedTokeninfo(c Context, scope string) (*tokeninfo, error) {
+	token := getToken(c.HTTPRequest())
 	if token == "" {
 		return nil, errors.New("No token found")
 	}
@@ -88,13 +87,27 @@ func scopedTokeninfo(c context.Context, scope string) (*tokeninfo, error) {
 		ti.Scope, scope)
 }
 
-// tokeninfoAuthenticator is an Authenticator that uses tokeninfo API
-// to validate bearer token.
-type tokeninfoAuthenticator struct{}
+// A context that uses tokeninfo API to validate bearer token
+type tokeninfoContext struct {
+	appengine.Context
+}
+
+func (c *tokeninfoContext) HTTPRequest() *http.Request {
+	return c.Request().(*http.Request)
+}
+
+// Namespace returns a replacement context that operates within the given namespace.
+func (c *tokeninfoContext) Namespace(name string) (Context, error) {
+	nc, err := appengine.Namespace(c, name)
+	if err != nil {
+		return nil, err
+	}
+	return &tokeninfoContext{nc}, nil
+}
 
 // CurrentOAuthClientID returns a clientID associated with the scope.
-func (tokeninfoAuthenticator) CurrentOAuthClientID(c context.Context, scope string) (string, error) {
-	ti, err := scopedTokeninfo(c, scope)
+func (c *tokeninfoContext) CurrentOAuthClientID(scope string) (string, error) {
+	ti, err := getScopedTokeninfo(c, scope)
 	if err != nil {
 		return "", err
 	}
@@ -102,16 +115,17 @@ func (tokeninfoAuthenticator) CurrentOAuthClientID(c context.Context, scope stri
 }
 
 // CurrentOAuthUser returns a user associated with the request in context.
-func (tokeninfoAuthenticator) CurrentOAuthUser(c context.Context, scope string) (*user.User, error) {
-	ti, err := scopedTokeninfo(c, scope)
+func (c *tokeninfoContext) CurrentOAuthUser(scope string) (*user.User, error) {
+	ti, err := getScopedTokeninfo(c, scope)
 	if err != nil {
 		return nil, err
 	}
 	return &user.User{Email: ti.Email}, nil
 }
 
-// tokeninfoAuthenticatorFactory creates a new tokeninfoAuthenticator from r.
-// To be used as auth.go/AuthenticatorFactory.
-func tokeninfoAuthenticatorFactory() Authenticator {
-	return tokeninfoAuthenticator{}
+// tokeninfoContextFactory creates a new tokeninfoContext from r.
+// To be used as auth.go/ContextFactory.
+func tokeninfoContextFactory(r *http.Request) Context {
+	ac := appengine.NewContext(r)
+	return &tokeninfoContext{ac}
 }

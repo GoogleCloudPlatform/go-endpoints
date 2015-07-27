@@ -34,7 +34,7 @@ Then, a service:
 
 	// List responds with a list of all greetings ordered by Date field.
 	// Most recent greets come first.
-	func (gs *GreetingService) List(c context.Context, r *GreetingsListReq) (*GreetingsList, error) {
+	func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*GreetingsList, error) {
 	  if r.Limit <= 0 {
 	    r.Limit = 10
 	  }
@@ -105,7 +105,7 @@ json.Unmarshaler interfaces.
 
 Let's say we have this method:
 
-	func (s *MyService) ListItems(c context.Context, r *ListReq) (*ItemsList, error) {
+	func (s *MyService) ListItems(c endpoints.Context, r *ListReq) (*ItemsList, error) {
 	  // fetch a list of items
 	}
 
@@ -149,7 +149,7 @@ of type QueryMarker:
 Now that our QueryMarker implements required interfaces we can use ListReq.Page
 field as if it were a `datastore.Cursor` in our service method, for instance:
 
-	func (s *MyService) ListItems(c context.Context, r *ListReq) (*ItemsList, error) {
+	func (s *MyService) ListItems(c endpoints.Context, r *ListReq) (*ItemsList, error) {
 	    list := &ItemsList{Items: make([]*Item, 0, r.Limit)}
 
 	    q := datastore.NewQuery("Item").Limit(r.Limit)
@@ -210,7 +210,7 @@ out of the box, if I wanted to:
 	}
 
 	// defined with "users/{id}" path template
-	func (s *MyService) GetUser(c context.Context, r *GetUserReq) (*User, error) {
+	func (s *MyService) GetUser(c endpoints.Context, r *GetUserReq) (*User, error) {
 	  user := &User{}
 	  if err := datastore.Get(c, r.Key, user); err != nil {
 	    return nil, err

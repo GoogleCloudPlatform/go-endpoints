@@ -7,9 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/net/context"
-
+	"appengine"
 	"appengine/aetest"
+
+	basepb "appengine_internal/base"
 )
 
 const (
@@ -48,7 +49,7 @@ func TestTokeninfoContextCurrentOAuthClientID(t *testing.T) {
 	rt := newTestRoundTripper()
 	origTransport := httpTransportFactory
 	defer func() { httpTransportFactory = origTransport }()
-	httpTransportFactory = func(c context.Context) http.RoundTripper {
+	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
 		return rt
 	}
 
@@ -89,13 +90,8 @@ func TestTokeninfoContextCurrentOAuthClientID(t *testing.T) {
 				Body:       ioutil.NopCloser(strings.NewReader(tt.content)),
 			})
 		}
-		c := newContext(r, tokeninfoAuthenticatorFactory)
-		auth := authenticator(c)
-		if auth == nil {
-			t.Errorf("%d: context authenticator missing", i)
-			continue
-		}
-		id, err := auth.CurrentOAuthClientID(c, tt.scope)
+		c := tokeninfoContextFactory(r)
+		id, err := c.CurrentOAuthClientID(tt.scope)
 		switch {
 		case err != nil && tt.clientID != "":
 			t.Errorf("%d: CurrentOAuthClientID(%v) = %v; want %q",
@@ -115,7 +111,7 @@ func TestTokeninfoCurrentOAuthUser(t *testing.T) {
 	defer func() {
 		httpTransportFactory = origTransport
 	}()
-	httpTransportFactory = func(c context.Context) http.RoundTripper {
+	httpTransportFactory = func(c appengine.Context) http.RoundTripper {
 		return newTestRoundTripper(&http.Response{
 			Status:     "200 OK",
 			StatusCode: 200,
@@ -128,17 +124,32 @@ func TestTokeninfoCurrentOAuthUser(t *testing.T) {
 	r.Header.Set("authorization", "bearer some_token")
 
 	const scope = "scope.one"
-	c := newContext(r, tokeninfoAuthenticatorFactory)
-	auth := authenticator(c)
-	if auth == nil {
-		t.Fatal("context authenticator missing")
-	}
-	user, err := auth.CurrentOAuthUser(c, scope)
+	c := tokeninfoContextFactory(r)
+	user, err := c.CurrentOAuthUser(scope)
 
 	if err != nil {
 		t.Fatalf("CurrentOAuthUser(%q) = %v", scope, err)
 	}
 	if user.Email != tokeninfoEmail {
 		t.Errorf("CurrentOAuthUser(%q) = %#v; want email = %q", scope, user, tokeninfoEmail)
+	}
+}
+
+func TestTokeinfoContextNamespace(t *testing.T) {
+	const namespace = "separated"
+
+	r, _, cleanup := newTestRequest(t, "GET", "/", nil)
+	defer cleanup()
+	c := tokeninfoContextFactory(r)
+	nc, err := c.Namespace(namespace)
+	if err != nil {
+		t.Fatalf("Namespace(%q) = %v", namespace, err)
+	}
+	ns := &basepb.StringProto{}
+	if err := nc.Call("__go__", "GetNamespace", &basepb.VoidProto{}, ns, nil); err != nil {
+		t.Fatalf("error calling __go__.GetNamespace: %v", err)
+	}
+	if ns.GetValue() != namespace {
+		t.Errorf("GetNamespace() = %q; want %q", ns.GetValue(), namespace)
 	}
 }
