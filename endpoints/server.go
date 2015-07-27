@@ -6,6 +6,7 @@
 package endpoints
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -66,6 +67,18 @@ func (s *Server) RegisterServiceWithDefaults(srv interface{}) (*RPCService, erro
 	return s.RegisterService(srv, "", "", "", true)
 }
 
+// Must is a helper that wraps a call to a function returning (*Template, error) and
+// panics if the error is non-nil. It is intended for use in variable initializations
+// such as:
+// 	var s = endpoints.Must(endpoints.RegisterService(s, "Service", "v1", "some service", true))
+//
+func Must(s *RPCService, err error) *RPCService {
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 // ServiceByName returns a registered service or nil if there's no service
 // registered by that name.
 func (s *Server) ServiceByName(serviceName string) *RPCService {
@@ -118,6 +131,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqValue := reflect.New(methodSpec.ReqType)
 
 	body, err := ioutil.ReadAll(r.Body)
+	r.Body.Close()
 	if err != nil {
 		writeError(w, err)
 		return
@@ -132,6 +146,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+
+	// Restore the body in the original request.
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
 
 	numIn, numOut := methodSpec.method.Type.NumIn(), methodSpec.method.Type.NumOut()
 	// Construct arguments for the method call

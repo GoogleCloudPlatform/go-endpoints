@@ -1,8 +1,10 @@
 package endpoints
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -14,6 +16,10 @@ import (
 
 type TestMsg struct {
 	Name string `json:"name"`
+}
+
+type BytesMsg struct {
+	Bytes []byte
 }
 
 type ServerTestService struct{}
@@ -103,6 +109,15 @@ func (s *ServerTestService) MsgWithoutRequestNorResponse(c Context) error {
 		return errors.New("MsgWithoutRequestNorResponse: c = nil")
 	}
 	return nil
+}
+
+func (s *ServerTestService) EchoRequest(r *http.Request, req *TestMsg) (*BytesMsg, error) {
+	b, err := ioutil.ReadAll(r.Body)
+	r.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	return &BytesMsg{b}, nil
 }
 
 func createAPIServer() *Server {
@@ -264,5 +279,55 @@ func TestServerRegisterService(t *testing.T) {
 		if m.wantsContext != tt.wantsContext {
 			t.Errorf("%d: wantsContext = %v; want %v", i, m.wantsContext, tt.wantsContext)
 		}
+	}
+}
+
+func TestServerMustRegisterService(t *testing.T) {
+	s := NewServer("")
+
+	var panicked interface{}
+	func() {
+		defer func() { panicked = recover() }()
+		Must(s.RegisterService(&ServerTestService{}, "ServerTestService", "v1", "", true))
+	}()
+	if panicked != nil {
+		t.Fatalf("unexpected panic: %v", panicked)
+	}
+
+	type badService struct{}
+	func() {
+		defer func() { panicked = recover() }()
+		Must(s.RegisterService(&badService{}, "BadService", "v1", "", true))
+	}()
+	if panicked == nil {
+		t.Fatalf("expected panic didn't occur")
+	}
+}
+
+func TestServerRequestNotEmpty(t *testing.T) {
+	server := createAPIServer()
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatalf("failed to create instance: %v", err)
+	}
+	defer inst.Close()
+
+	path := "/ServerTestService.EchoRequest"
+	body := `{"name": "francesc"}`
+	r, err := inst.NewRequest("POST", path, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("failed to create req: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	server.ServeHTTP(w, r)
+
+	var res BytesMsg
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("decode response %q: %v", w.Body.String(), err)
+	}
+
+	if string(res.Bytes) != body {
+		t.Fatalf("expected %q; got %q", body, res)
 	}
 }
