@@ -7,9 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
+	"appengine"
 )
 
 // Levels that can be specified for a LogMessage.
@@ -66,7 +64,7 @@ func (s *BackendService) GetApiConfigs(
 			err := fmt.Errorf(
 				"API backend app revision %s not the same as expected %s",
 				revision, req.AppRevision)
-			log.Errorf(c, "%s", err)
+			c.Errorf("%s", err)
 			return err
 		}
 	}
@@ -78,12 +76,12 @@ func (s *BackendService) GetApiConfigs(
 		}
 		d := &APIDescriptor{}
 		if err := service.APIDescriptor(d, r.Host); err != nil {
-			log.Errorf(c, "%s", err)
+			c.Errorf("%s", err)
 			return err
 		}
 		bytes, err := json.Marshal(d)
 		if err != nil {
-			log.Errorf(c, "%s", err)
+			c.Errorf("%s", err)
 			return err
 		}
 		resp.Items = append(resp.Items, string(bytes))
@@ -114,19 +112,19 @@ func (s *BackendService) GetFirstConfig(
 	return errors.New("Not Found: No public API found")
 }
 
-func writeLogMessage(c context.Context, level logLevel, msg string) {
+func writeLogMessage(c appengine.Context, level logLevel, msg string) {
 	const fmt = "%s"
 	switch level {
 	case levelDebug:
-		log.Debugf(c, fmt, msg)
+		c.Debugf(fmt, msg)
 	case levelWarning:
-		log.Warningf(c, fmt, msg)
+		c.Warningf(fmt, msg)
 	case levelError:
-		log.Errorf(c, fmt, msg)
+		c.Errorf(fmt, msg)
 	case levelCritical:
-		log.Criticalf(c, fmt, msg)
+		c.Criticalf(fmt, msg)
 	default:
-		log.Infof(c, fmt, msg)
+		c.Infof(fmt, msg)
 	}
 }
 

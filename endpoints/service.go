@@ -14,8 +14,6 @@ import (
 	"sync"
 	"unicode"
 	"unicode/utf8"
-
-	"golang.org/x/net/context"
 )
 
 var (
@@ -23,8 +21,8 @@ var (
 	typeOfOsError = reflect.TypeOf((*error)(nil)).Elem()
 	// Same as above, this time for http.Request.
 	typeOfRequest = reflect.TypeOf((*http.Request)(nil)).Elem()
-	// Precompute the reflect type for context.Context.
-	typeOfContext = reflect.TypeOf((*context.Context)(nil)).Elem()
+	// Precompute the reflect type for Context.
+	typeOfContext = reflect.TypeOf((*Context)(nil)).Elem()
 	// Precompute the reflect type for *VoidMessage.
 	typeOfVoidMessage = reflect.TypeOf(new(VoidMessage))
 )
