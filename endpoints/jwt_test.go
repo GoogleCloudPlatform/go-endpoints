@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"appengine"
-	"appengine/memcache"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/memcache"
 )
 
 var jwtValidTokenObject = signedJWT{
@@ -232,7 +233,7 @@ func TestCurrentIDTokenUser(t *testing.T) {
 
 	var currToken *signedJWT
 
-	jwtParser = func(Context, string, int64) (*signedJWT, error) {
+	jwtParser = func(context.Context, string, int64) (*signedJWT, error) {
 		if currToken == nil {
 			return nil, errors.New("Fake verification failed")
 		}
