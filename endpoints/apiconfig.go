@@ -766,7 +766,7 @@ func validateRequest(r interface{}) error {
 
 func validateField(v reflect.Value, t reflect.StructField) error {
 	// only validate simple types, ignore arrays, slices, chans, etc.
-	if v.Kind() >= reflect.Array && v.Kind() != reflect.String {
+	if v.Kind() > reflect.Float64 && v.Kind() != reflect.String {
 		return nil
 	}
 
