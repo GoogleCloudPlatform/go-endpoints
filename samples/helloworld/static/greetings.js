@@ -27,7 +27,7 @@ function GreetingsCtrl($scope, $http) {
   $scope.refresh = function() {
     api.list({'limit':100}).execute(function(res) {
       $scope.running = false;
-      $scope.greetings = res.result.items;
+      $scope.greetings = res.result.items || [];
       $scope.$apply();
    });
   };
