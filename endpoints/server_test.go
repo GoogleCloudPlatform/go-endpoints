@@ -3,6 +3,7 @@ package endpoints
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -65,6 +66,42 @@ func (s *ServerTestService) Unauthorized(r *http.Request, req, resp *TestMsg) er
 
 func (s *ServerTestService) Conflict(r *http.Request, req, resp *TestMsg) error {
 	return ConflictError
+}
+
+type RequiredMsg struct {
+	Name string `endpoints:"req"`
+}
+
+func (s *ServerTestService) TestRequired(r *http.Request, req *RequiredMsg) error {
+	return nil
+}
+
+type DefaultMsg struct {
+	Name   string  `endpoints:"d=gopher"`
+	Age    int     `endpoints:"d=10"`
+	Weight float64 `endpoints:"d=0.5"`
+}
+
+func (s *ServerTestService) TestDefault(r *http.Request, req *DefaultMsg) error {
+	var sent *DefaultMsg
+	if err := json.NewDecoder(r.Body).Decode(&sent); err != nil {
+		return fmt.Errorf("decoding original message: %v", err)
+	}
+
+	// check that rcv is a good value given sent and default values.
+	check := func(sent, z, rcv, def interface{}) bool {
+		return (sent == z && rcv == def) || (sent != z && sent == rcv)
+	}
+	if !check(sent.Name, "", req.Name, "gopher") {
+		return fmt.Errorf("wrong name: %q", req.Name)
+	}
+	if !check(sent.Age, 0, req.Age, 10) {
+		return fmt.Errorf("wrong age: %v", req.Age)
+	}
+	if !check(sent.Weight, 0.0, req.Weight, 0.5) {
+		return fmt.Errorf("wrong weight: %v", req.Weight)
+	}
+	return nil
 }
 
 // Service methods for args testing
@@ -184,6 +221,14 @@ func TestServerServeHTTP(t *testing.T) {
 		{"PUT", "Void", `{}`, ``, http.StatusBadRequest},
 		{"HEAD", "Void", `{}`, ``, http.StatusBadRequest},
 		{"DELETE", "Void", `{}`, ``, http.StatusBadRequest},
+
+		{"POST", "TestRequired", `{}`, ``, http.StatusBadRequest},
+		{"POST", "TestRequired", `{"name":"francesc"}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"name":"francesc"}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"age": 20}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"weight": 3.14}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"name":"francesc", "age": 20}`, ``, http.StatusOK},
 	}
 
 	for i, tt := range tts {

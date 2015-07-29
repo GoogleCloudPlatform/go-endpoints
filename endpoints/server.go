@@ -146,6 +146,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := validateRequest(reqValue.Interface()); err != nil {
+		writeError(w, err)
+		return
+	}
+
 	// Restore the body in the original request.
 	r.Body = ioutil.NopCloser(bytes.NewReader(body))
 

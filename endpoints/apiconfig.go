@@ -744,3 +744,44 @@ func parseValue(s string, k reflect.Kind) (interface{}, error) {
 
 	return nil, fmt.Errorf("parseValue: Invalid kind %#v value=%q", k, s)
 }
+
+func validateRequest(r interface{}) error {
+	v := reflect.ValueOf(r)
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("%T is not a pointer", r)
+	}
+	v = reflect.Indirect(v)
+	if v.Kind() != reflect.Struct {
+		return fmt.Errorf("%T is not a pointer to a struct", r)
+	}
+
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		if err := validateField(v.Field(i), t.Field(i)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateField(v reflect.Value, t reflect.StructField) error {
+	tag, err := parseTag(t.Tag)
+	if err != nil {
+		return fmt.Errorf("parse tag: %v", err)
+	}
+	if v.Interface() != reflect.Zero(v.Type()).Interface() {
+		return nil
+	}
+	if tag.required {
+		return fmt.Errorf("missing field %q", t.Name)
+	}
+	if tag.defaultVal == "" {
+		return nil
+	}
+	r, err := parseValue(tag.defaultVal, v.Kind())
+	if err != nil {
+		return err
+	}
+	v.Set(reflect.ValueOf(r))
+	return nil
+}
