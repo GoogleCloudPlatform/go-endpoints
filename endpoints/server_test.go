@@ -104,6 +104,16 @@ func (s *ServerTestService) TestDefault(r *http.Request, req *DefaultMsg) error 
 	return nil
 }
 
+type MinMaxMsg struct {
+	Age    int32   `endpoints:"min=0,max=100"`
+	Weight float32 `endpoints:"min=3.14,max=31.4"`
+	Grade  string  `endpoints:"min=A,max=F"`
+}
+
+func (s *ServerTestService) TestMinMax(r *http.Request, req *MinMaxMsg) error {
+	return nil
+}
+
 // Service methods for args testing
 
 func (s *ServerTestService) MsgWithRequest(r *http.Request, req, resp *TestMsg) error {
@@ -229,6 +239,10 @@ func TestServerServeHTTP(t *testing.T) {
 		{"POST", "TestDefault", `{"age": 20}`, ``, http.StatusOK},
 		{"POST", "TestDefault", `{"weight": 3.14}`, ``, http.StatusOK},
 		{"POST", "TestDefault", `{"name":"francesc", "age": 20}`, ``, http.StatusOK},
+		{"POST", "TestMinMax", `{"age":10,"weight":5,"grade":"C"}`, ``, http.StatusOK},
+		{"POST", "TestMinMax", `{"age":123,"weight":5,"grade":"C"}`, ``, http.StatusBadRequest},
+		{"POST", "TestMinMax", `{"age":10,"weight":1,"grade":"C"}`, ``, http.StatusBadRequest},
+		{"POST", "TestMinMax", `{"age":10,"weight":5,"grade":"G"}`, ``, http.StatusBadRequest},
 	}
 
 	for i, tt := range tts {
