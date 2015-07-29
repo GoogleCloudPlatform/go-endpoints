@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/go-endpoints/endpoints"
-
-	"appengine/datastore"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine/datastore"
 )
 
 // Greeting is a datastore entity that represents a single greeting.
@@ -53,7 +53,7 @@ type GreetingService struct{}
 
 // List responds with a list of all greetings ordered by Date field.
 // Most recent greets come first.
-func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*GreetingsList, error) {
+func (gs *GreetingService) List(c context.Context, r *GreetingsListReq) (*GreetingsList, error) {
 	q := datastore.NewQuery("Greeting").Order("-Date").Limit(r.Limit)
 	greets := make([]*Greeting, 0, r.Limit)
 	keys, err := q.GetAll(c, &greets)
@@ -68,7 +68,7 @@ func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*Gree
 }
 
 // Add adds a greeting.
-func (gs *GreetingService) Add(c endpoints.Context, r *GreetingAddReq) error {
+func (gs *GreetingService) Add(c context.Context, r *GreetingAddReq) error {
 	k := datastore.NewIncompleteKey(c, "Greeting", nil)
 	g := &Greeting{
 		Author:  r.Author,
