@@ -774,19 +774,78 @@ func validateField(v reflect.Value, t reflect.StructField) error {
 	if err != nil {
 		return fmt.Errorf("parse tag: %v", err)
 	}
-	if v.Interface() != reflect.Zero(v.Type()).Interface() {
-		return nil
+
+	isZero := v.Interface() == reflect.Zero(v.Type()).Interface()
+	if isZero && tag.required {
+		return fmt.Errorf("missing field %v", t.Name)
 	}
-	if tag.required {
-		return fmt.Errorf("missing field %q", t.Name)
+
+	if isZero && tag.defaultVal != "" {
+		r, err := parseValue(tag.defaultVal, v.Kind())
+		if err != nil {
+			return fmt.Errorf("parse default value: %v", err)
+		}
+		v.Set(reflect.ValueOf(r))
 	}
-	if tag.defaultVal == "" {
-		return nil
+
+	if tag.minVal != "" {
+		cmp, err := compare(v, tag.minVal)
+		if err != nil {
+			return fmt.Errorf("compare with min value: %v", err)
+		}
+		if cmp < 0 {
+			return fmt.Errorf("%v is too small", v)
+		}
 	}
-	r, err := parseValue(tag.defaultVal, v.Kind())
-	if err != nil {
-		return err
+
+	if tag.maxVal != "" {
+		cmp, err := compare(v, tag.maxVal)
+		if err != nil {
+			return fmt.Errorf("compare with min value: %v", err)
+		}
+		if cmp > 0 {
+			return fmt.Errorf("%v is too big", v)
+		}
 	}
-	v.Set(reflect.ValueOf(r))
 	return nil
+}
+
+// compare parses the given text to a value of the same type of a and
+// compares them. It returns -1 if a < b, 1 if a > b, or 0 if a == b.
+func compare(a reflect.Value, text string) (int, error) {
+	val, err := parseValue(text, a.Kind())
+	if err != nil {
+		return 0, fmt.Errorf("parse min value: %v", err)
+	}
+	b := reflect.ValueOf(val)
+	cmp := 0
+	switch a.Interface().(type) {
+	case int, int8, int16, int32, int64:
+		if a, b := a.Int(), b.Int(); a < b {
+			cmp = -1
+		} else if a > b {
+			cmp = 1
+		}
+	case uint, uint8, uint16, uint32, uint64:
+		if a, b := a.Uint(), b.Uint(); a < b {
+			cmp = -1
+		} else if a > b {
+			cmp = 1
+		}
+	case float32, float64:
+		if a, b := a.Float(), b.Float(); a < b {
+			cmp = -1
+		} else if a > b {
+			cmp = 1
+		}
+	case string:
+		if a, b := a.String(), b.String(); a < b {
+			cmp = -1
+		} else if a > b {
+			cmp = 1
+		}
+	default:
+		return 0, fmt.Errorf("unsupported type %v", a.Type())
+	}
+	return cmp, nil
 }
