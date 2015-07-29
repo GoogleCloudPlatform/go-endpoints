@@ -104,6 +104,17 @@ func (s *ServerTestService) TestDefault(r *http.Request, req *DefaultMsg) error 
 	return nil
 }
 
+type SliceMsg struct {
+	Strings []string
+	Ints    []int
+	Bytes   []byte
+	Bools   []bool
+}
+
+func (s *ServerTestService) TestSliceMsg(r *http.Request, req *SliceMsg) error {
+	return nil
+}
+
 type MinMaxMsg struct {
 	Age    int32   `endpoints:"min=0,max=100"`
 	Weight float32 `endpoints:"min=3.14,max=31.4"`
@@ -239,6 +250,13 @@ func TestServerServeHTTP(t *testing.T) {
 		{"POST", "TestDefault", `{"age": 20}`, ``, http.StatusOK},
 		{"POST", "TestDefault", `{"weight": 3.14}`, ``, http.StatusOK},
 		{"POST", "TestDefault", `{"name":"francesc", "age": 20}`, ``, http.StatusOK},
+
+		{"POST", "TestSliceMsg", `{}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"strings":["a", "b"]}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"ints":[1, 2]}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"bytes":[0, 1]}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"bools":[true, false]}`, ``, http.StatusOK},
+
 		{"POST", "TestMinMax", `{"age":10,"weight":5,"grade":"C"}`, ``, http.StatusOK},
 		{"POST", "TestMinMax", `{"age":123,"weight":5,"grade":"C"}`, ``, http.StatusBadRequest},
 		{"POST", "TestMinMax", `{"age":10,"weight":1,"grade":"C"}`, ``, http.StatusBadRequest},
