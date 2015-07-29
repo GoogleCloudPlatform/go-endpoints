@@ -104,6 +104,17 @@ func (s *ServerTestService) TestDefault(r *http.Request, req *DefaultMsg) error 
 	return nil
 }
 
+type SliceMsg struct {
+	Strings []string
+	Ints    []int
+	Bytes   []byte
+	Bools   []bool
+}
+
+func (s *ServerTestService) TestSliceMsg(r *http.Request, req *SliceMsg) error {
+	return nil
+}
+
 // Service methods for args testing
 
 func (s *ServerTestService) MsgWithRequest(r *http.Request, req, resp *TestMsg) error {
@@ -229,6 +240,12 @@ func TestServerServeHTTP(t *testing.T) {
 		{"POST", "TestDefault", `{"age": 20}`, ``, http.StatusOK},
 		{"POST", "TestDefault", `{"weight": 3.14}`, ``, http.StatusOK},
 		{"POST", "TestDefault", `{"name":"francesc", "age": 20}`, ``, http.StatusOK},
+
+		{"POST", "TestSliceMsg", `{}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"strings":["a", "b"]}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"ints":[1, 2]}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"bytes":[0, 1]}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"bools":[true, false]}`, ``, http.StatusOK},
 	}
 
 	for i, tt := range tts {
