@@ -81,7 +81,7 @@ type GreetingService struct {
 
 // List responds with a list of all greetings ordered by Date field.
 // Most recent greets come first.
-func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*GreetingsList, error) {
+func (gs *GreetingService) List(c context.Context, r *GreetingsListReq) (*GreetingsList, error) {
   if r.Limit <= 0 {
     r.Limit = 10
   }
@@ -103,7 +103,7 @@ func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*Gree
 We can also define methods that don't require a response or a request.
 ```go
 // Add adds a greeting.
-func (gs *GreetingService) Add(c endpoints.Context, g *Greeting) error {
+func (gs *GreetingService) Add(c context.Context, g *Greeting) error {
     k := datastore.NewIncompleteKey(c, "Greeting", nil)
     _, err := datastore.Put(c, k, g)
     return err
@@ -114,7 +114,7 @@ type Count struct {
 }
 
 // Count returns the number of greetings.
-func (gs *GreetingService) Count(c endpoints.Context) (*Count, error) {
+func (gs *GreetingService) Count(c context.Context) (*Count, error) {
     n, err := datastore.NewQuery("Greeting").Count(c)
     if err != nil {
         return nil, err
@@ -127,7 +127,10 @@ Last step is to make the above available as a **discoverable API**
 and leverage all the juicy stuff Cloud Endpoints are great at.
 
 ```go
-import "github.com/GoogleCloudPlatform/go-endpoints/endpoints"
+import (
+  "github.com/GoogleCloudPlatform/go-endpoints/endpoints"
+  "golang.org/x/net/context"
+)
 
 func init() {
   greetService := &GreetingService{}
