@@ -113,7 +113,7 @@ const googCerts = `{
 	}]
 }`
 
-func TestverifySignedJWT(t *testing.T) {
+func TestVerifySignedJWT(t *testing.T) {
 	r, _, closer := newTestRequest(t, "GET", "/", nil)
 	defer closer()
 	nc, err := appengine.Namespace(appengine.NewContext(r), certNamespace)
