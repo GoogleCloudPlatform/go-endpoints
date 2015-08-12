@@ -252,6 +252,7 @@ type signedJWTHeader struct {
 type signedJWT struct {
 	Audience string `json:"aud"`
 	ClientID string `json:"azp"`
+	Subject  string `json:"sub"`
 	Email    string `json:"email"`
 	Expires  int64  `json:"exp"`
 	IssuedAt int64  `json:"iat"`
@@ -464,8 +465,6 @@ func verifyParsedToken(c context.Context, token signedJWT, audiences []string, c
 
 // currentIDTokenUser returns "appengine/user".User object if provided JWT token
 // was successfully decoded and passed all verifications.
-//
-// Currently, only Email field will be set in case of success.
 func currentIDTokenUser(c context.Context, jwt string, audiences []string, clientIDs []string, now int64) (*user.User, error) {
 	parsedToken, err := jwtParser(c, jwt, now)
 	if err != nil {
@@ -474,7 +473,9 @@ func currentIDTokenUser(c context.Context, jwt string, audiences []string, clien
 
 	if verifyParsedToken(c, *parsedToken, audiences, clientIDs) {
 		return &user.User{
-			Email: parsedToken.Email,
+			ID:       parsedToken.Subject,
+			Email:    parsedToken.Email,
+			ClientID: parsedToken.ClientID,
 		}, nil
 	}
 
@@ -539,7 +540,10 @@ func CurrentBearerTokenUser(c context.Context, scopes []string, clientIDs []stri
 // It first tries to decode and verify JWT token (if conditions are met)
 // and falls back to Bearer token.
 //
-// NOTE: Currently, returned user will have only Email field set when JWT is used.
+// The returned user will have only ID, Email and ClientID fields set.
+// User.ID is a Google Account ID, which is different from GAE user ID.
+// For more info on User.ID see 'sub' claim description on
+// https://developers.google.com/identity/protocols/OpenIDConnect#obtainuserinfo
 func CurrentUser(c context.Context, scopes []string, audiences []string, clientIDs []string) (*user.User, error) {
 	// The user hasn't provided any information to allow us to parse either
 	// an ID token or a Bearer token.

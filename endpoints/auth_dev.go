@@ -107,7 +107,11 @@ func (tokeninfoAuthenticator) CurrentOAuthUser(c context.Context, scope string) 
 	if err != nil {
 		return nil, err
 	}
-	return &user.User{Email: ti.Email}, nil
+	return &user.User{
+		ID:       ti.UserID,
+		Email:    ti.Email,
+		ClientID: ti.IssuedTo,
+	}, nil
 }
 
 // tokeninfoAuthenticatorFactory creates a new tokeninfoAuthenticator from r.
