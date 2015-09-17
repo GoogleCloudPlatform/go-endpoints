@@ -1,5 +1,3 @@
-// +build appengine
-
 // Copyright 2009 The Go Authors. All rights reserved.
 // Copyright 2012 The Gorilla Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -8,6 +6,7 @@
 package endpoints
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	// Mainly for debug logging
 	"io/ioutil"
+
+	"google.golang.org/appengine/log"
 )
 
 // Server serves registered RPC services using registered codecs.
@@ -68,6 +69,18 @@ func (s *Server) RegisterServiceWithDefaults(srv interface{}) (*RPCService, erro
 	return s.RegisterService(srv, "", "", "", true)
 }
 
+// Must is a helper that wraps a call to a function returning (*Template, error) and
+// panics if the error is non-nil. It is intended for use in variable initializations
+// such as:
+// 	var s = endpoints.Must(endpoints.RegisterService(s, "Service", "v1", "some service", true))
+//
+func Must(s *RPCService, err error) *RPCService {
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 // ServiceByName returns a registered service or nil if there's no service
 // registered by that name.
 func (s *Server) ServiceByName(serviceName string) *RPCService {
@@ -86,9 +99,6 @@ func (s *Server) HandleHTTP(mux *http.ServeMux) {
 // ServeHTTP is Server's implementation of http.Handler interface.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := NewContext(r)
-	defer func() {
-		destroyContext(c)
-	}()
 
 	// Always respond with JSON, even when an error occurs.
 	// Note: API server doesn't expect an encoding in Content-Type header.
@@ -120,11 +130,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqValue := reflect.New(methodSpec.ReqType)
 
 	body, err := ioutil.ReadAll(r.Body)
+	r.Body.Close()
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	c.Debugf("SPI request body: %s", body)
+	log.Debugf(c, "SPI request body: %s", body)
 
 	// if err := json.NewDecoder(r.Body).Decode(req.Interface()); err != nil {
 	// 	writeError(w, fmt.Errorf("Error while decoding JSON: %q", err))
@@ -135,15 +146,27 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := validateRequest(reqValue.Interface()); err != nil {
+		writeError(w, err)
+		return
+	}
+
+	// Restore the body in the original request.
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+	numIn, numOut := methodSpec.method.Type.NumIn(), methodSpec.method.Type.NumOut()
 	// Construct arguments for the method call
 	var httpReqOrCtx interface{} = r
 	if methodSpec.wantsContext {
 		httpReqOrCtx = c
 	}
-	args := []reflect.Value{serviceSpec.rcvr, reflect.ValueOf(httpReqOrCtx), reqValue}
+	args := []reflect.Value{serviceSpec.rcvr, reflect.ValueOf(httpReqOrCtx)}
+	if numIn > 2 {
+		args = append(args, reqValue)
+	}
 
 	var respValue reflect.Value
-	if !methodSpec.returnsResp {
+	if numIn > 3 {
 		respValue = reflect.New(methodSpec.RespType)
 		args = append(args, respValue)
 	}
@@ -151,7 +174,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Invoke the service method
 	var errValue reflect.Value
 	res := methodSpec.method.Func.Call(args)
-	if methodSpec.returnsResp {
+	if numOut == 2 {
 		respValue = res[0]
 		errValue = res[1]
 	} else {
@@ -165,8 +188,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Encode non-error response
-	if err := json.NewEncoder(w).Encode(respValue.Interface()); err != nil {
-		writeError(w, err)
+	if numIn == 4 || numOut == 2 {
+		if err := json.NewEncoder(w).Encode(respValue.Interface()); err != nil {
+			writeError(w, err)
+		}
 	}
 }
 

@@ -12,9 +12,39 @@ documentation for [Python][1] or [Java][2].
 
 ## Install
 
-```bash
-go get -u github.com/GoogleCloudPlatform/go-endpoints/endpoints
+Use [goapp tool][goapp] from the Google App Engine SDK for Go to get the package:
+
 ```
+GO_APPENGINE/goapp get github.com/GoogleCloudPlatform/go-endpoints/endpoints
+```
+
+If you'll ever need to pull updates from the upstream, execute `git pull`
+from the root of this repo.
+
+Alternatively, if you don't have `goapp` for some reason, do the standard
+
+```
+go get github.com/GoogleCloudPlatform/go-endpoints/endpoints
+```
+
+If this is not the first time you're "getting" the package,
+add `-u` param to get an updated version, i.e. `go get -u ...`.
+
+Now, you'll see a couple errors:
+
+```
+package appengine: unrecognized import path "appengine"
+package appengine/user: unrecognized import path "appengine/user"
+package appengine_internal/user: unrecognized import path "appengine_internal/user"
+```
+
+which is OK, don't worry! The issue here is Go looks at all imports in
+`endpoints` package and cannot find "appengine/*" packages nowhere in your
+`$GOPATH`. That's because they're not there, indeed. Appengine packages are
+normally available only when running an app with dev appserver, and since that's
+precisely what we want to do, "unrecognized import path" errors can be safely
+ignored.
+
 
 ## Usage
 
@@ -70,6 +100,29 @@ func (gs *GreetingService) List(c endpoints.Context, r *GreetingsListReq) (*Gree
 }
 ```
 
+We can also define methods that don't require a response or a request.
+```go
+// Add adds a greeting.
+func (gs *GreetingService) Add(c endpoints.Context, g *Greeting) error {
+    k := datastore.NewIncompleteKey(c, "Greeting", nil)
+    _, err := datastore.Put(c, k, g)
+    return err
+}
+
+type Count struct {
+    N int `json:"count"`
+}
+
+// Count returns the number of greetings.
+func (gs *GreetingService) Count(c endpoints.Context) (*Count, error) {
+    n, err := datastore.NewQuery("Greeting").Count(c)
+    if err != nil {
+        return nil, err
+    }
+    return &Count{n}, nil
+}
+```
+
 Last step is to make the above available as a **discoverable API**
 and leverage all the juicy stuff Cloud Endpoints are great at.
 
@@ -81,13 +134,21 @@ func init() {
   api, err := endpoints.RegisterService(greetService,
     "greeting", "v1", "Greetings API", true)
   if err != nil {
-    panic(err.Error())
+    log.Fatalf("Register service: %v", err)
   }
 
-  info := api.MethodByName("List").Info()
-  info.Name, info.HTTPMethod, info.Path, info.Desc =
-    "greets.list", "GET", "greetings", "List most recent greetings."
+  register := func(orig, name, method, path, desc string) {
+      m := api.MethodByName(orig)
+      if m == nil {
+          log.Fatalf("Missing method %s", orig)
+      }
+      i := m.Info()
+      i.Name, i.HTTPMethod, i.Path, i.Desc = name, method, path, desc
+  }
 
+  register("List", "greets.list", "GET", "greetings", "List most recent greetings.")
+  register("Add", "greets.add", "PUT", "greetings", "Add a greeting.")
+  register("Count", "greets.count", "GET", "greetings/count", "Count all greetings.")
   endpoints.HandleHTTP()
 }
 ```
@@ -121,9 +182,9 @@ Naturally, API Explorer works too:
 
 Time to deploy the app on [appengine.appspot.com][7]!
 
-**N.B.** At present, you can't map your endpoint URL to a custom domain. Bossylobster 
+**N.B.** At present, you can't map your endpoint URL to a custom domain. Bossylobster
 [wrote](http://stackoverflow.com/a/16124815/1745000): "It's a non-trivial networking problem
-and something Google certainly plan on supporting in the future. Keep in mind, Cloud Endpoints 
+and something Google certainly plan on supporting in the future. Keep in mind, Cloud Endpoints
 is a combination or App Engine and Google's API Infrastructure."
 
 ## Generate client libs
@@ -178,9 +239,10 @@ cd discovery_api_dart_client_generator
 pub install
 
 # Generate your client library:
+mkdir input
 URL='https://my-app-id.appspot.com/_ah/api/discovery/v1/apis/greeting/v1/rest'
-curl -s -o greetings.rpc.discovery $URL
-bin/generate.dart --no-prefix -i greetings.rpc.discovery -o ../
+curl -s -o input/greeting.json $URL
+bin/generate.dart package -i input -o ../dart_my-app-id_v1_api_client --package-name my-app-id_v1_api
 ```
 
 Now you just have to add your endpoints client library to your dart application (assuming it is in the parent directory.)
@@ -212,7 +274,7 @@ Or you can just play it on the [live demo app][13].
 
 You'll need Google App Engine SDK for Go to run tests.
 
-Once you get that installed, use `goapp` tool to run all tests from the root 
+Once you get that installed, use `goapp` tool to run all tests from the root
 of this repo:
 
 ```
@@ -230,8 +292,8 @@ GO_APPENGINE_SDK/goapp test -v ./endpoints 2> /dev/null
 
 
 
-[1]: https://developers.google.com/appengine/docs/python/endpoints/
-[2]: https://developers.google.com/appengine/docs/java/endpoints/
+[1]: https://cloud.google.com/appengine/docs/python/endpoints/
+[2]: https://cloud.google.com/appengine/docs/java/endpoints/
 [3]: https://github.com/crhym3/go-tictactoe
 [5]: http://localhost:8080/_ah/api/discovery/v1/apis/greeting/v1/rest
 [6]: http://localhost:8080/_ah/api/explorer

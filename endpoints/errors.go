@@ -1,9 +1,8 @@
-// +build appengine
-
 package endpoints
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -13,35 +12,20 @@ var (
 	// Use NewAPIError() method to create your own.
 
 	// InternalServerError is default error with http.StatusInternalServerError (500)
-	InternalServerError = NewInternalServerError(errorNames[0])
+	InternalServerError = NewInternalServerError("")
 	// BadRequestError is default error with http.StatusBadRequest (400)
-	BadRequestError = NewBadRequestError(errorNames[1])
+	BadRequestError = NewBadRequestError("")
 	// UnauthorizedError is default error with http.StatusUnauthorized (401)
-	UnauthorizedError = NewUnauthorizedError(errorNames[2])
+	UnauthorizedError = NewUnauthorizedError("")
 	// ForbiddenError is default error with http.StatusForbidden (403)
-	ForbiddenError = NewForbiddenError(errorNames[3])
+	ForbiddenError = NewForbiddenError("")
 	// NotFoundError is default error with http.StatusNotFound (404)
-	NotFoundError = NewNotFoundError(errorNames[4])
+	NotFoundError = NewNotFoundError("")
 	// ConflictError is default error with http.StatusConflict (409)
-	ConflictError = NewConflictError(errorNames[5])
+	ConflictError = NewConflictError("")
 
-	// errorNames is a slice of known error names (or better, their prefixes).
-	// First element is default error name.
-	// See newErrorResponse method for details.
-	errorNames = []string{
-		"Internal Server Error",
-		"Bad Request",
-		"Unauthorized",
-		"Forbidden",
-		"Not Found",
-		"Conflict",
-	}
-
-	// errorCodes is a slice of known error codes (or better, their prefixes).
-	// Each errorCodes element corresponds to an errorNames item at the same
-	// position.
-	// See newErrorResponse method for details.
-	errorCodes = []int{
+	// knownErrors is a list of all known errors.
+	knownErrors = [...]int{
 		http.StatusInternalServerError,
 		http.StatusBadRequest,
 		http.StatusUnauthorized,
@@ -65,37 +49,42 @@ func (a *APIError) Error() string {
 
 // NewAPIError Create a new APIError for custom error
 func NewAPIError(name string, msg string, code int) error {
-	return &APIError{Name: name, Msg: msg, Code: code}
+	return &APIError{name, msg, code}
+}
+
+// errorf creates a new APIError given its status code, a format string and its arguments.
+func errorf(code int, format string, args ...interface{}) error {
+	return &APIError{http.StatusText(code), fmt.Sprintf(format, args...), code}
 }
 
 // NewInternalServerError creates a new APIError with Internal Server Error status (500)
-func NewInternalServerError(msg string) error {
-	return NewAPIError("Internal Server Error", msg, http.StatusInternalServerError)
+func NewInternalServerError(format string, args ...interface{}) error {
+	return errorf(http.StatusInternalServerError, format, args...)
 }
 
 // NewBadRequestError creates a new APIError with Bad Request status (400)
-func NewBadRequestError(msg string) error {
-	return NewAPIError("Bad Request", msg, http.StatusBadRequest)
+func NewBadRequestError(format string, args ...interface{}) error {
+	return errorf(http.StatusBadRequest, format, args...)
 }
 
 // NewUnauthorizedError creates a new APIError with Unauthorized status (401)
-func NewUnauthorizedError(msg string) error {
-	return NewAPIError("Unauthorized", msg, http.StatusUnauthorized)
+func NewUnauthorizedError(format string, args ...interface{}) error {
+	return errorf(http.StatusUnauthorized, format, args...)
 }
 
 // NewNotFoundError creates a new APIError with Not Found status (404)
-func NewNotFoundError(msg string) error {
-	return NewAPIError("Not Found", msg, http.StatusNotFound)
+func NewNotFoundError(format string, args ...interface{}) error {
+	return errorf(http.StatusNotFound, format, args...)
 }
 
 // NewForbiddenError creates a new APIError with Forbidden status (403)
-func NewForbiddenError(msg string) error {
-	return NewAPIError("Forbidden", msg, http.StatusForbidden)
+func NewForbiddenError(format string, args ...interface{}) error {
+	return errorf(http.StatusForbidden, format, args...)
 }
 
 // NewConflictError creates a new APIError with Conflict status (409)
-func NewConflictError(msg string) error {
-	return NewAPIError("Conflict", msg, http.StatusConflict)
+func NewConflictError(format string, args ...interface{}) error {
+	return errorf(http.StatusConflict, format, args...)
 }
 
 // errorResponse is SPI-compatible error response
@@ -108,35 +97,23 @@ type errorResponse struct {
 }
 
 // Creates and initializes a new errorResponse.
-// If msg contains any of errorNames then errorResponse.Name will be set
+// If msg contains any of knownErrors then errorResponse.Name will be set
 // to that name and the rest of the msg becomes errorResponse.Msg.
 // Otherwise, a default error name is used and msg argument
 // is errorResponse.Msg.
-func newErrorResponse(e error) *errorResponse {
-	switch t := e.(type) {
-	case *APIError:
-		return &errorResponse{State: "APPLICATION_ERROR", Name: t.Name, Msg: t.Msg, Code: t.Code}
+func newErrorResponse(err error) *errorResponse {
+	if e, ok := err.(*APIError); ok {
+		return &errorResponse{"APPLICATION_ERROR", e.Name, e.Msg, e.Code}
 	}
-
-	msg := e.Error()
-
-	err := &errorResponse{State: "APPLICATION_ERROR"}
-	for i, name := range errorNames {
-		if strings.HasPrefix(msg, name) {
-			err.Name = name
-			err.Msg = strings.TrimPrefix(msg, name)
-			err.Msg = strings.TrimSpace(strings.TrimPrefix(err.Msg, ":"))
-			err.Code = errorCodes[i]
+	msg := err.Error()
+	for _, code := range knownErrors {
+		if name := http.StatusText(code); strings.HasPrefix(msg, name) {
+			return &errorResponse{"APPLICATION_ERROR", name, strings.Trim(msg[len(name):], " :"), code}
 		}
 	}
-	if err.Name == "" {
-		err.Name = errorNames[0]
-		err.Msg = msg
-		//for compatibility, Before behavior, always return 400 HTTP Status Code.
-		// TODO(alex): where is 400 coming from?
-		err.Code = 400
-	}
-	return err
+	//for compatibility, Before behavior, always return 400 HTTP Status Code.
+	// TODO(alex): where is 400 coming from?
+	return &errorResponse{"APPLICATION_ERROR", http.StatusText(http.StatusInternalServerError), msg, http.StatusBadRequest}
 }
 
 // writeError writes SPI-compatible error response.

@@ -1,5 +1,3 @@
-// +build appengine
-
 // Copyright 2009 The Go Authors. All rights reserved.
 // Copyright 2012 The Gorilla Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -9,12 +7,15 @@ package endpoints
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 	"strings"
 	"sync"
 	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/net/context"
 )
 
 var (
@@ -22,8 +23,10 @@ var (
 	typeOfOsError = reflect.TypeOf((*error)(nil)).Elem()
 	// Same as above, this time for http.Request.
 	typeOfRequest = reflect.TypeOf((*http.Request)(nil)).Elem()
-	// Precompute the reflect type for Context.
-	typeOfContext = reflect.TypeOf((*Context)(nil)).Elem()
+	// Precompute the reflect type for context.Context.
+	typeOfContext = reflect.TypeOf((*context.Context)(nil)).Elem()
+	// Precompute the reflect type for *VoidMessage.
+	typeOfVoidMessage = reflect.TypeOf(new(VoidMessage))
 )
 
 // ----------------------------------------------------------------------------
@@ -84,8 +87,6 @@ type ServiceMethod struct {
 	method *reflect.Method
 	// first argument of the method is Context
 	wantsContext bool
-	// it's up to the method to create and return RespType
-	returnsResp bool
 	// info used to construct Endpoints API config
 	info *MethodInfo
 }
@@ -184,27 +185,40 @@ func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault
 func newServiceMethod(m *reflect.Method, internal bool) *ServiceMethod {
 	// Method must be exported.
 	if m.PkgPath != "" {
+		log.Printf("method %#v is not exported", m)
 		return nil
 	}
 
-	var httpReqType, reqType, respType, errType reflect.Type
 	mtype := m.Type
-	switch {
-	// method(receiver, *http.Request, *reqType, *resType) error
-	case mtype.NumIn() == 4 && mtype.NumOut() == 1:
-		httpReqType = mtype.In(1)
-		reqType = mtype.In(2)
-		respType = mtype.In(3)
-		errType = mtype.Out(0)
-	// method(receiver, *http.Request, *reqType) (*resType, error)
-	case mtype.NumIn() == 3 && mtype.NumOut() == 2:
-		httpReqType = mtype.In(1)
-		reqType = mtype.In(2)
-		respType = mtype.Out(0)
-		errType = mtype.Out(1)
-	default:
+	numIn, numOut := mtype.NumIn(), mtype.NumOut()
+
+	// Endpoint methods have at least a receiver plus one to three arguments and
+	// return either one or two values.
+	if !(2 <= numIn && numIn <= 4 && 1 <= numOut && numOut <= 2) {
 		return nil
 	}
+	// The response message is either an input or and output, not both.
+	if numIn == 4 && numOut == 2 {
+		return nil
+	}
+
+	// Endpoint methods have an http request or context as first argument.
+	httpReqType := mtype.In(1)
+	// If there's a request type it's the second argument.
+	reqType := typeOfVoidMessage
+	if numIn > 2 {
+		reqType = mtype.In(2)
+	}
+	// The response type can be either as the third argument or the first
+	// returned value followed by an error.
+	respType := typeOfVoidMessage
+	if numIn > 3 {
+		respType = mtype.In(3)
+	} else if numOut == 2 {
+		respType = mtype.Out(0)
+	}
+	// The last returned value is an error.
+	errType := mtype.Out(mtype.NumOut() - 1)
 
 	// First argument must be a pointer and must be http.Request or Context.
 	if !isRequestOrContext(httpReqType) {
@@ -228,7 +242,6 @@ func newServiceMethod(m *reflect.Method, internal bool) *ServiceMethod {
 		RespType:     respType.Elem(),
 		method:       m,
 		wantsContext: httpReqType.Implements(typeOfContext),
-		returnsResp:  mtype.NumOut() > 1,
 	}
 	if !internal {
 		mname := strings.ToLower(m.Name)

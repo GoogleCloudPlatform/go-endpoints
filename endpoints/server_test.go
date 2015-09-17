@@ -1,21 +1,28 @@
-// +build appengine
-
 package endpoints
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"appengine/aetest"
 )
 
 type TestMsg struct {
 	Name string `json:"name"`
+}
+
+type BytesMsg struct {
+	Bytes []byte
 }
 
 type ServerTestService struct{}
@@ -61,6 +68,63 @@ func (s *ServerTestService) Conflict(r *http.Request, req, resp *TestMsg) error 
 	return ConflictError
 }
 
+type RequiredMsg struct {
+	Name string `endpoints:"req"`
+}
+
+func (s *ServerTestService) TestRequired(r *http.Request, req *RequiredMsg) error {
+	return nil
+}
+
+type DefaultMsg struct {
+	Name   string  `endpoints:"d=gopher"`
+	Age    int     `endpoints:"d=10"`
+	Weight float64 `endpoints:"d=0.5"`
+}
+
+func (s *ServerTestService) TestDefault(r *http.Request, req *DefaultMsg) error {
+	var sent *DefaultMsg
+	if err := json.NewDecoder(r.Body).Decode(&sent); err != nil {
+		return fmt.Errorf("decoding original message: %v", err)
+	}
+
+	// check that rcv is a good value given sent and default values.
+	check := func(sent, z, rcv, def interface{}) bool {
+		return (sent == z && rcv == def) || (sent != z && sent == rcv)
+	}
+	if !check(sent.Name, "", req.Name, "gopher") {
+		return fmt.Errorf("wrong name: %q", req.Name)
+	}
+	if !check(sent.Age, 0, req.Age, 10) {
+		return fmt.Errorf("wrong age: %v", req.Age)
+	}
+	if !check(sent.Weight, 0.0, req.Weight, 0.5) {
+		return fmt.Errorf("wrong weight: %v", req.Weight)
+	}
+	return nil
+}
+
+type SliceMsg struct {
+	Strings []string
+	Ints    []int
+	Bytes   []byte
+	Bools   []bool
+}
+
+func (s *ServerTestService) TestSliceMsg(r *http.Request, req *SliceMsg) error {
+	return nil
+}
+
+type MinMaxMsg struct {
+	Age    int32   `endpoints:"min=0,max=100"`
+	Weight float32 `endpoints:"min=3.14,max=31.4"`
+	Grade  string  `endpoints:"min=A,max=F"`
+}
+
+func (s *ServerTestService) TestMinMax(r *http.Request, req *MinMaxMsg) error {
+	return nil
+}
+
 // Service methods for args testing
 
 func (s *ServerTestService) MsgWithRequest(r *http.Request, req, resp *TestMsg) error {
@@ -71,7 +135,7 @@ func (s *ServerTestService) MsgWithRequest(r *http.Request, req, resp *TestMsg) 
 	return nil
 }
 
-func (s *ServerTestService) MsgWithContext(c Context, req, resp *TestMsg) error {
+func (s *ServerTestService) MsgWithContext(c context.Context, req, resp *TestMsg) error {
 	if c == nil {
 		return errors.New("MsgWithContext: c = nil")
 	}
@@ -79,11 +143,41 @@ func (s *ServerTestService) MsgWithContext(c Context, req, resp *TestMsg) error 
 	return nil
 }
 
-func (s *ServerTestService) MsgWithReturn(c Context, req *TestMsg) (*TestMsg, error) {
+func (s *ServerTestService) MsgWithReturn(c context.Context, req *TestMsg) (*TestMsg, error) {
 	if c == nil {
-		return nil, errors.New("MsgReturnResp: c = nil")
+		return nil, errors.New("MsgWithReturn: c = nil")
 	}
 	return &TestMsg{req.Name}, nil
+}
+
+func (s *ServerTestService) MsgWithoutRequest(c context.Context) (*TestMsg, error) {
+	if c == nil {
+		return nil, errors.New("MsgWithoutRequest: c = nil")
+	}
+	return &TestMsg{}, nil
+}
+
+func (s *ServerTestService) MsgWithoutResponse(c context.Context, req *TestMsg) error {
+	if c == nil {
+		return errors.New("MsgWithoutResponse: c = nil")
+	}
+	return nil
+}
+
+func (s *ServerTestService) MsgWithoutRequestNorResponse(c context.Context) error {
+	if c == nil {
+		return errors.New("MsgWithoutRequestNorResponse: c = nil")
+	}
+	return nil
+}
+
+func (s *ServerTestService) EchoRequest(r *http.Request, req *TestMsg) (*BytesMsg, error) {
+	b, err := ioutil.ReadAll(r.Body)
+	r.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	return &BytesMsg{b}, nil
 }
 
 func createAPIServer() *Server {
@@ -99,12 +193,13 @@ func createAPIServer() *Server {
 		sm := &ServiceMethod{
 			method:       &m,
 			wantsContext: m.Type.In(1).Implements(typeOfContext),
-			ReqType:      m.Type.In(2).Elem(),
+		}
+		if m.Type.NumIn() > 2 {
+			sm.ReqType = m.Type.In(2).Elem()
 		}
 		if m.Type.NumOut() == 2 {
-			sm.returnsResp = true
 			sm.RespType = m.Type.Out(0).Elem()
-		} else {
+		} else if m.Type.NumIn() > 3 {
 			sm.RespType = m.Type.In(3).Elem()
 		}
 		rpc.methods[m.Name] = sm
@@ -147,6 +242,25 @@ func TestServerServeHTTP(t *testing.T) {
 		{"PUT", "Void", `{}`, ``, http.StatusBadRequest},
 		{"HEAD", "Void", `{}`, ``, http.StatusBadRequest},
 		{"DELETE", "Void", `{}`, ``, http.StatusBadRequest},
+
+		{"POST", "TestRequired", `{}`, ``, http.StatusBadRequest},
+		{"POST", "TestRequired", `{"name":"francesc"}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"name":"francesc"}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"age": 20}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"weight": 3.14}`, ``, http.StatusOK},
+		{"POST", "TestDefault", `{"name":"francesc", "age": 20}`, ``, http.StatusOK},
+
+		{"POST", "TestSliceMsg", `{}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"strings":["a", "b"]}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"ints":[1, 2]}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"bytes":[0, 1]}`, ``, http.StatusOK},
+		{"POST", "TestSliceMsg", `{"bools":[true, false]}`, ``, http.StatusOK},
+
+		{"POST", "TestMinMax", `{"age":10,"weight":5,"grade":"C"}`, ``, http.StatusOK},
+		{"POST", "TestMinMax", `{"age":123,"weight":5,"grade":"C"}`, ``, http.StatusBadRequest},
+		{"POST", "TestMinMax", `{"age":10,"weight":1,"grade":"C"}`, ``, http.StatusBadRequest},
+		{"POST", "TestMinMax", `{"age":10,"weight":5,"grade":"G"}`, ``, http.StatusBadRequest},
 	}
 
 	for i, tt := range tts {
@@ -164,11 +278,6 @@ func TestServerServeHTTP(t *testing.T) {
 
 		// do the fake request
 		server.ServeHTTP(w, r)
-
-		// verify endpoints.context has been destroyed
-		if c, exists := ctxs[r]; exists {
-			t.Errorf("%d: ctxs[%#v] = %#v; want nil", i, r, c)
-		}
 
 		// make sure the response is correct
 		out := strings.TrimSpace(w.Body.String())
@@ -244,8 +353,55 @@ func TestServerRegisterService(t *testing.T) {
 		if m.wantsContext != tt.wantsContext {
 			t.Errorf("%d: wantsContext = %v; want %v", i, m.wantsContext, tt.wantsContext)
 		}
-		if m.returnsResp != tt.returnsResp {
-			t.Errorf("%d: returnsResp = %v; want %v", i, m.returnsResp, tt.returnsResp)
-		}
+	}
+}
+
+func TestServerMustRegisterService(t *testing.T) {
+	s := NewServer("")
+
+	var panicked interface{}
+	func() {
+		defer func() { panicked = recover() }()
+		Must(s.RegisterService(&ServerTestService{}, "ServerTestService", "v1", "", true))
+	}()
+	if panicked != nil {
+		t.Fatalf("unexpected panic: %v", panicked)
+	}
+
+	type badService struct{}
+	func() {
+		defer func() { panicked = recover() }()
+		Must(s.RegisterService(&badService{}, "BadService", "v1", "", true))
+	}()
+	if panicked == nil {
+		t.Fatalf("expected panic didn't occur")
+	}
+}
+
+func TestServerRequestNotEmpty(t *testing.T) {
+	server := createAPIServer()
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatalf("failed to create instance: %v", err)
+	}
+	defer inst.Close()
+
+	path := "/ServerTestService.EchoRequest"
+	body := `{"name": "francesc"}`
+	r, err := inst.NewRequest("POST", path, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("failed to create req: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	server.ServeHTTP(w, r)
+
+	var res BytesMsg
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("decode response %q: %v", w.Body.String(), err)
+	}
+
+	if string(res.Bytes) != body {
+		t.Fatalf("expected %q; got %q", body, res)
 	}
 }

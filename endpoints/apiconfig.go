@@ -1,5 +1,3 @@
-// +build appengine
-
 package endpoints
 
 import (
@@ -14,7 +12,7 @@ import (
 )
 
 // curlyBrackets is used for generating the key for dups map in APIDescriptor().
-var curlyBrackets = regexp.MustCompile("{.+}")
+var curlyBrackets = regexp.MustCompile("{.+?}")
 
 // APIDescriptor is the top-level struct for a single Endpoints API config.
 type APIDescriptor struct {
@@ -745,4 +743,109 @@ func parseValue(s string, k reflect.Kind) (interface{}, error) {
 	}
 
 	return nil, fmt.Errorf("parseValue: Invalid kind %#v value=%q", k, s)
+}
+
+func validateRequest(r interface{}) error {
+	v := reflect.ValueOf(r)
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("%T is not a pointer", r)
+	}
+	v = reflect.Indirect(v)
+	if v.Kind() != reflect.Struct {
+		return fmt.Errorf("%T is not a pointer to a struct", r)
+	}
+
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		if err := validateField(v.Field(i), t.Field(i)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateField(v reflect.Value, t reflect.StructField) error {
+	// only validate simple types, ignore arrays, slices, chans, etc.
+	if v.Kind() > reflect.Float64 && v.Kind() != reflect.String {
+		return nil
+	}
+
+	tag, err := parseTag(t.Tag)
+	if err != nil {
+		return fmt.Errorf("parse tag: %v", err)
+	}
+
+	isZero := v.Interface() == reflect.Zero(v.Type()).Interface()
+	if isZero && tag.required {
+		return fmt.Errorf("missing field %v", t.Name)
+	}
+
+	if isZero && tag.defaultVal != "" {
+		r, err := parseValue(tag.defaultVal, v.Kind())
+		if err != nil {
+			return fmt.Errorf("parse default value: %v", err)
+		}
+		v.Set(reflect.ValueOf(r))
+	}
+
+	if tag.minVal != "" {
+		cmp, err := compare(v, tag.minVal)
+		if err != nil {
+			return fmt.Errorf("compare with min value: %v", err)
+		}
+		if cmp < 0 {
+			return fmt.Errorf("%v is too small", v)
+		}
+	}
+
+	if tag.maxVal != "" {
+		cmp, err := compare(v, tag.maxVal)
+		if err != nil {
+			return fmt.Errorf("compare with min value: %v", err)
+		}
+		if cmp > 0 {
+			return fmt.Errorf("%v is too big", v)
+		}
+	}
+	return nil
+}
+
+// compare parses the given text to a value of the same type of a and
+// compares them. It returns -1 if a < b, 1 if a > b, or 0 if a == b.
+func compare(a reflect.Value, text string) (int, error) {
+	val, err := parseValue(text, a.Kind())
+	if err != nil {
+		return 0, fmt.Errorf("parse min value: %v", err)
+	}
+	b := reflect.ValueOf(val)
+	cmp := 0
+	switch a.Interface().(type) {
+	case int, int8, int16, int32, int64:
+		if a, b := a.Int(), b.Int(); a < b {
+			cmp = -1
+		} else if a > b {
+			cmp = 1
+		}
+	case uint, uint8, uint16, uint32, uint64:
+		if a, b := a.Uint(), b.Uint(); a < b {
+			cmp = -1
+		} else if a > b {
+			cmp = 1
+		}
+	case float32, float64:
+		if a, b := a.Float(), b.Float(); a < b {
+			cmp = -1
+		} else if a > b {
+			cmp = 1
+		}
+	case string:
+		if a, b := a.String(), b.String(); a < b {
+			cmp = -1
+		} else if a > b {
+			cmp = 1
+		}
+	default:
+		return 0, fmt.Errorf("unsupported type %v", a.Type())
+	}
+	return cmp, nil
 }

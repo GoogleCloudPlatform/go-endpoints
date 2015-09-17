@@ -1,5 +1,3 @@
-// +build appengine
-
 package endpoints
 
 import (
@@ -377,6 +375,28 @@ func TestDuplicateHTTPMethodPath(t *testing.T) {
 		t.Fatal("want duplicate HTTP method + path error")
 	}
 	t.Logf("dup method error: %v", err)
+}
+
+func TestNotDuplicateHTTPMethodPathWhenMultipleBrackets(t *testing.T) {
+	// Test for https://github.com/GoogleCloudPlatform/go-endpoints/issues/74
+	dummy := &DummyService{}
+	server := NewServer("")
+	s, err := server.RegisterService(dummy, "Dummy", "v1", "A service", true)
+	if err != nil {
+		t.Fatalf("error registering service: %s", err)
+	}
+
+	info := s.MethodByName("GetSub").Info()
+	info.HTTPMethod, info.Path = "GET", "some/{param}"
+	info = s.MethodByName("GetList").Info()
+	info.HTTPMethod, info.Path = "GET", "some/{param1}/path/{param2}"
+
+	d := &APIDescriptor{}
+	err = s.APIDescriptor(d, "testhost:1234")
+	if err != nil {
+		t.Logf("dup method error: %v", err)
+		t.Fatal("Don't want duplicate HTTP method + path error")
+	}
 }
 
 func TestPrefixedSchemaName(t *testing.T) {

@@ -1,5 +1,3 @@
-// +build appengine
-
 package endpoints
 
 import (
@@ -8,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"appengine"
-	"appengine/memcache"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/memcache"
 )
 
 var jwtValidTokenObject = signedJWT{
@@ -114,7 +113,7 @@ const googCerts = `{
 	}]
 }`
 
-func TestverifySignedJWT(t *testing.T) {
+func TestVerifySignedJWT(t *testing.T) {
 	r, _, closer := newTestRequest(t, "GET", "/", nil)
 	defer closer()
 	nc, err := appengine.Namespace(appengine.NewContext(r), certNamespace)
@@ -234,7 +233,7 @@ func TestCurrentIDTokenUser(t *testing.T) {
 
 	var currToken *signedJWT
 
-	jwtParser = func(Context, string, int64) (*signedJWT, error) {
+	jwtParser = func(context.Context, string, int64) (*signedJWT, error) {
 		if currToken == nil {
 			return nil, errors.New("Fake verification failed")
 		}
