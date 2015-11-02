@@ -154,7 +154,7 @@ func maxAge(s string) int {
 }
 
 // certExpirationTime computes a cert freshness based on Cache-Control
-// and Age headers of h.
+// and Age or Expires headers of h.
 //
 // Returns 0 if one of the required headers is not present or cert lifetime
 // is expired.
@@ -162,6 +162,7 @@ func certExpirationTime(h http.Header) time.Duration {
 	// http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2 indicates only
 	// a comma-separated header is valid, so it should be fine to split this on
 	// commas.
+
 	var max int
 	for _, entry := range strings.Split(h.Get("Cache-Control"), ",") {
 		max = maxAge(entry)
@@ -173,17 +174,32 @@ func certExpirationTime(h http.Header) time.Duration {
 		return 0
 	}
 
-	age, err := strconv.Atoi(h.Get("Age"))
-	if err != nil {
-		return 0
-	}
+	if ageHeader := h.Get("Age"); ageHeader != "" {
+		age, err := strconv.Atoi(ageHeader)
+		if err != nil {
+			return 0
+		}
 
-	remainingTime := max - age
-	if remainingTime <= 0 {
-		return 0
+		remainingTime := max - age
+		if remainingTime <= 0 {
+			return 0
+		}
+		return time.Duration(remainingTime) * time.Second
 	}
-
-	return time.Duration(remainingTime) * time.Second
+	if expiresHeader := h.Get("Expires"); expiresHeader != "" {
+		if dateHeader := h.Get("Date"); dateHeader != "" {
+			date, err := time.Parse(time.RFC1123, dateHeader)
+			if err != nil {
+				return 0
+			}
+			expires, err := time.Parse(time.RFC1123, expiresHeader)
+			if err != nil {
+				return 0
+			}
+			return expires.Sub(date)
+		}
+	}
+	return 0
 }
 
 // cachedCerts fetches public certificates info from DefaultCertURI and
