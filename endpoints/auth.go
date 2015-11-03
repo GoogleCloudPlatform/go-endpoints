@@ -22,7 +22,10 @@ import (
 	"google.golang.org/appengine/user"
 )
 
-const APIExplorerClientID = "292824132082.apps.googleusercontent.com"
+const (
+	APIExplorerClientID = "292824132082.apps.googleusercontent.com"
+	EmailScope          = "https://www.googleapis.com/auth/userinfo.email"
+)
 
 var AuthProvider = &AuthProviderConfig{
 	IssuerID: "accounts.google.com",
@@ -30,7 +33,7 @@ var AuthProvider = &AuthProviderConfig{
 		"v1/metadata/raw/federated-signon@system.gserviceaccount.com",
 	UserInfoEndpoint: "https://www.googleapis.com/oauth2/v1/tokeninfo",
 	ScopesSupported: []string{
-		"https://www.googleapis.com/auth/userinfo.email",
+		EmailScope,
 		"openid",
 		"email",
 		"profile",
