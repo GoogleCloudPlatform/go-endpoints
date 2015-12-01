@@ -180,7 +180,7 @@ func TestCachedCertsCacheHit(t *testing.T) {
 	    	 "modulus": "123"} ]}`,
 			&certsList{[]*certInfo{{"RS256", "123", "some-id", "123"}}}},
 	}
-	ec := NewContext(req)
+	ec := NewContext(req, nil, nil)
 	for i, tt := range tts {
 		item := &memcache.Item{Key: DefaultCertURI, Value: []byte(tt.cacheValue)}
 		if err := memcache.Set(nc, item); err != nil {
@@ -213,7 +213,7 @@ func TestCachedCertsCacheMiss(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ec := NewContext(req)
+	ec := NewContext(req, nil, nil)
 
 	tts := []*struct {
 		respStatus                     int
@@ -430,5 +430,5 @@ func newContext(r *http.Request, factory func() Authenticator) context.Context {
 		AuthenticatorFactory = old
 	}(AuthenticatorFactory)
 	AuthenticatorFactory = factory
-	return NewContext(r)
+	return NewContext(r, nil, nil)
 }

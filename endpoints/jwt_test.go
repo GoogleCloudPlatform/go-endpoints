@@ -140,7 +140,7 @@ func TestVerifySignedJWT(t *testing.T) {
 		{"another.invalid.token", jwtValidTokenTime, nil},
 	}
 
-	ec := NewContext(r)
+	ec := NewContext(r, nil, nil)
 
 	for i, tt := range tts {
 		jwt, err := verifySignedJWT(ec, tt.token, tt.now.Unix())
@@ -183,7 +183,7 @@ func TestVerifyParsedToken(t *testing.T) {
 
 	r, _, closer := newTestRequest(t, "GET", "/", nil)
 	defer closer()
-	c := NewContext(r)
+	c := NewContext(r, nil, nil)
 
 	for i, tt := range tts {
 		jwt := signedJWT{
@@ -208,7 +208,7 @@ func TestCurrentIDTokenUser(t *testing.T) {
 
 	r, _, closer := newTestRequest(t, "GET", "/", nil)
 	defer closer()
-	c := NewContext(r)
+	c := NewContext(r, nil, nil)
 
 	aud := []string{jwtValidTokenObject.Audience, jwtValidTokenObject.ClientID}
 	azp := []string{jwtValidTokenObject.ClientID}

@@ -187,12 +187,18 @@ func createAPIServer() *Server {
 		rcvr:     reflect.ValueOf(s),
 		rcvrType: reflect.TypeOf(s),
 		methods:  make(map[string]*ServiceMethod),
+		info: &ServiceInfo{
+			Name: "ServerTestService",
+		},
 	}
 	for i := 0; i < rpc.rcvrType.NumMethod(); i++ {
 		m := rpc.rcvrType.Method(i)
 		sm := &ServiceMethod{
 			method:       &m,
 			wantsContext: m.Type.In(1).Implements(typeOfContext),
+			info: &MethodInfo{
+				Name: m.Name,
+			},
 		}
 		if m.Type.NumIn() > 2 {
 			sm.ReqType = m.Type.In(2).Elem()
@@ -437,7 +443,7 @@ func TestContextDecorator(t *testing.T) {
 		return nil, ConflictError
 	}
 	path := "/ServerTestService.ContextDecorator"
-	r, _ := inst.NewRequest("GET", path, strings.NewReader(""))
+	r, _ := inst.NewRequest("POST", path, strings.NewReader(""))
 	w := httptest.NewRecorder()
 	server.ServeHTTP(w, r)
 	if w.Code != http.StatusConflict {
@@ -453,6 +459,40 @@ func TestContextDecorator(t *testing.T) {
 
 	r, _ = inst.NewRequest("POST", path, strings.NewReader("{}"))
 	w = httptest.NewRecorder()
+	server.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status OK (200); got %v", w.Code)
+		msg, _ := ioutil.ReadAll(w.Body)
+		t.Errorf("response body: %s", msg)
+	}
+}
+
+func (s *ServerTestService) ContextParameters(ctx context.Context) error {
+	req := HTTPRequest(ctx)
+	if req == nil {
+		return errors.New("no HTTP request in context")
+	}
+	si, mi := EndpointInfo(ctx)
+	if si == nil || si.Name != "ServerTestService" {
+		return fmt.Errorf("invalid ServiceInfo in context: %#v", si)
+	}
+	if mi == nil || mi.Name != "ContextParameters" {
+		return fmt.Errorf("invalid MethodInfo in context: %#v", mi)
+	}
+	return nil
+}
+
+func TestContextParameters(t *testing.T) {
+	server := createAPIServer()
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatalf("failed to create instance: %v", err)
+	}
+	defer inst.Close()
+
+	path := "/ServerTestService.ContextParameters"
+	r, _ := inst.NewRequest("POST", path, strings.NewReader("{}"))
+	w := httptest.NewRecorder()
 	server.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
 		t.Errorf("expected status OK (200); got %v", w.Code)
