@@ -81,11 +81,27 @@ const (
 	invalidKey contextKey = iota
 	requestKey
 	authenticatorKey
+	serviceInfoKey
+	methodInfoKey
 )
 
 // HTTPRequest returns the request associated with a context.
 func HTTPRequest(c context.Context) *http.Request {
 	r, _ := c.Value(requestKey).(*http.Request)
+	return r
+}
+
+// GetServiceInfo returns the ServiceInfo of the service that the current
+// request is using. This may only be used on Context's created with NewContext.
+func GetServiceInfo(c context.Context) *ServiceInfo {
+	r, _ := c.Value(serviceInfoKey).(*ServiceInfo)
+	return r
+}
+
+// GetMethodInfo returns the MethodInfo of the method that the current
+// request is using. This may only be used on Context's created with NewContext.
+func GetMethodInfo(c context.Context) *MethodInfo {
+	r, _ := c.Value(methodInfoKey).(*MethodInfo)
 	return r
 }
 
@@ -103,10 +119,12 @@ var (
 )
 
 // NewContext returns a new context for an in-flight API (HTTP) request.
-func NewContext(r *http.Request) context.Context {
+func NewContext(r *http.Request, si *ServiceInfo, mi *MethodInfo) context.Context {
 	c := appengine.NewContext(r)
 	c = context.WithValue(c, requestKey, r)
 	c = context.WithValue(c, authenticatorKey, AuthenticatorFactory())
+	c = context.WithValue(c, serviceInfoKey, si)
+	c = context.WithValue(c, methodInfoKey, mi)
 	return c
 }
 
