@@ -432,3 +432,27 @@ func newContext(r *http.Request, factory func() Authenticator) context.Context {
 	AuthenticatorFactory = factory
 	return NewContext(r)
 }
+
+func TestContextDecorator(t *testing.T) {
+	defer func(old func(context.Context) context.Context) {
+		ContextDecorator = old
+	}(ContextDecorator)
+
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatalf("failed to create instance: %v", err)
+	}
+	defer inst.Close()
+
+	key := "this is the key"
+	value := new(int)
+	ContextDecorator = func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, key, value)
+	}
+
+	r, _ := inst.NewRequest("GET", "/", nil)
+	ctx := NewContext(r)
+	if got := ctx.Value(key); got != value {
+		t.Errorf("expected value in context was %v; got %v", value, got)
+	}
+}
