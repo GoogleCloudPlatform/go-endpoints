@@ -102,11 +102,18 @@ var (
 	errNoRequest       = errors.New("no request for context (use endpoints.NewContext to create a context)")
 )
 
+// ContextDecorator will be called as the last step of the creation of a new context.
+// If nil the context will not be decorated.
+var ContextDecorator func(context.Context) context.Context
+
 // NewContext returns a new context for an in-flight API (HTTP) request.
 func NewContext(r *http.Request) context.Context {
 	c := appengine.NewContext(r)
 	c = context.WithValue(c, requestKey, r)
 	c = context.WithValue(c, authenticatorKey, AuthenticatorFactory())
+	if ContextDecorator != nil {
+		c = ContextDecorator(c)
+	}
 	return c
 }
 
