@@ -15,11 +15,24 @@ import (
 	// Mainly for debug logging
 	"io/ioutil"
 
+	"golang.org/x/net/context"
 	"google.golang.org/appengine/log"
 )
 
 // Server serves registered RPC services using registered codecs.
 type Server struct {
+	// ContextFunc, if not nil, returns the Context to pass to a given service
+	// method handler.
+	//
+	// The initial Context supplied to ContextFunc is the standard endpoints
+	// context, and the resulting Context is forwarded to the handler. The service
+	// and method may be extracted from it using GetServiceInfo and GetMethodInfo
+	// respectively.
+	//
+	// If an error is returned, it is handled in the same manner as if the handler
+	// had returned an error.
+	ContextFunc func(context.Context) (context.Context, error)
+
 	root     string
 	services *serviceMap
 }
@@ -98,8 +111,6 @@ func (s *Server) HandleHTTP(mux *http.ServeMux) {
 
 // ServeHTTP is Server's implementation of http.Handler interface.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c := NewContext(r)
-
 	// Always respond with JSON, even when an error occurs.
 	// Note: API server doesn't expect an encoding in Content-Type header.
 	w.Header().Set("Content-Type", "application/json")
@@ -124,6 +135,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, err)
 		return
+	}
+
+	// Generate the Context for this request.
+	c := NewContext(r, serviceSpec.info, methodSpec.info)
+	if s.ContextFunc != nil {
+		c, err = s.ContextFunc(c)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
 	}
 
 	// Initialize RPC method request
