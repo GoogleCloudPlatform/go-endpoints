@@ -196,6 +196,8 @@ func createAPIServer() *Server {
 		}
 		if m.Type.NumIn() > 2 {
 			sm.ReqType = m.Type.In(2).Elem()
+		} else {
+			sm.ReqType = typeOfVoidMessage.Elem()
 		}
 		if m.Type.NumOut() == 2 {
 			sm.RespType = m.Type.Out(0).Elem()
@@ -261,6 +263,10 @@ func TestServerServeHTTP(t *testing.T) {
 		{"POST", "TestMinMax", `{"age":123,"weight":5,"grade":"C"}`, ``, http.StatusBadRequest},
 		{"POST", "TestMinMax", `{"age":10,"weight":1,"grade":"C"}`, ``, http.StatusBadRequest},
 		{"POST", "TestMinMax", `{"age":10,"weight":5,"grade":"G"}`, ``, http.StatusBadRequest},
+
+		{"POST", "MsgWithoutRequest", `{}`, `{"name":""}`, http.StatusOK},
+		{"POST", "MsgWithoutResponse", `{}`, ``, http.StatusOK},
+		{"POST", "MsgWithoutRequestNorResponse", `{}`, ``, http.StatusOK},
 	}
 
 	for i, tt := range tts {
