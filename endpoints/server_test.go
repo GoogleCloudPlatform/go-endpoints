@@ -411,3 +411,52 @@ func TestServerRequestNotEmpty(t *testing.T) {
 		t.Fatalf("expected %q; got %q", body, res)
 	}
 }
+
+const (
+	contextDecoratorKey   = "context_decorator_key"
+	contextDecoratorValue = "context_decorator_value"
+)
+
+func (s *ServerTestService) ContextDecorator(ctx context.Context) (*VoidMessage, error) {
+	fmt.Println("ContextDecorator called")
+	if got := ctx.Value(contextDecoratorKey); got != contextDecoratorValue {
+		return nil, NewBadRequestError("wrong context value: %q", got)
+	}
+	return &VoidMessage{}, nil
+}
+
+func TestContextDecorator(t *testing.T) {
+	server := createAPIServer()
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatalf("failed to create instance: %v", err)
+	}
+	defer inst.Close()
+
+	server.ContextDecorator = func(ctx context.Context) (context.Context, error) {
+		return nil, ConflictError
+	}
+	path := "/ServerTestService.ContextDecorator"
+	r, _ := inst.NewRequest("GET", path, strings.NewReader(""))
+	w := httptest.NewRecorder()
+	server.ServeHTTP(w, r)
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected status code Conflict (409); got %v", w.Code)
+		msg, _ := ioutil.ReadAll(w.Body)
+		t.Errorf("response body: %s", msg)
+	}
+
+	server.ContextDecorator = func(ctx context.Context) (context.Context, error) {
+		fmt.Println("context decorated")
+		return context.WithValue(ctx, contextDecoratorKey, contextDecoratorValue), nil
+	}
+
+	r, _ = inst.NewRequest("POST", path, strings.NewReader("{}"))
+	w = httptest.NewRecorder()
+	server.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status OK (200); got %v", w.Code)
+		msg, _ := ioutil.ReadAll(w.Body)
+		t.Errorf("response body: %s", msg)
+	}
+}
