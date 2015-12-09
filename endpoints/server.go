@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+
+	"golang.org/x/net/context"
 	// Mainly for debug logging
 	"io/ioutil"
 
@@ -22,6 +24,10 @@ import (
 type Server struct {
 	root     string
 	services *serviceMap
+
+	// ContextDecorator will be called as the last step of the creation of a new context.
+	// If nil the context will not be decorated.
+	ContextDecorator func(context.Context) (context.Context, error)
 }
 
 // NewServer returns a new RPC server.
@@ -99,6 +105,14 @@ func (s *Server) HandleHTTP(mux *http.ServeMux) {
 // ServeHTTP is Server's implementation of http.Handler interface.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := NewContext(r)
+	if s.ContextDecorator != nil {
+		ctx, err := s.ContextDecorator(c)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		c = ctx
+	}
 
 	// Always respond with JSON, even when an error occurs.
 	// Note: API server doesn't expect an encoding in Content-Type header.
