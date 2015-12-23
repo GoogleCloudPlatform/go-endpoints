@@ -81,7 +81,7 @@ func (gs *GreetingService) Add(c context.Context, r *GreetingAddReq) error {
 
 func init() {
 	api, err := endpoints.RegisterService(&GreetingService{},
-		"greetings", "v1", "Greetings API", true)
+		"greeting", "v1", "Greetings API", true)
 	if err != nil {
 		log.Fatalf("Register service: %v", err)
 	}
