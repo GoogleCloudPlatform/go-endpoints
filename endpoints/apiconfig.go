@@ -598,11 +598,17 @@ func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
 			name = f.Name
 		}
 
-		if f.Type.Kind() == reflect.Struct && f.Anonymous {
-			for nname, nfield := range fieldNames(f.Type, flatten) {
-				m[nname] = nfield
+		if f.Anonymous {
+			ft := f.Type
+			if ft.Kind() == reflect.Ptr {
+				ft = ft.Elem()
 			}
-			continue
+			if ft.Kind() == reflect.Struct {
+				for nname, nfield := range fieldNames(ft, flatten) {
+					m[nname] = nfield
+				}
+				continue
+			}
 		}
 
 		if flatten && indirectKind(f.Type) == reflect.Struct &&

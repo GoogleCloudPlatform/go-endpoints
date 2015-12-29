@@ -45,7 +45,18 @@ func (m *canMarshal) UnmarshalJSON(b []byte) error {
 var _ = json.Marshaler((*canMarshal)(nil))
 var _ = json.Unmarshaler((*canMarshal)(nil))
 
+type EmbeddedPtr struct {
+	EmbeddedString string `json:"embedded_string_ptr"`
+}
+
+type Embedded struct {
+	EmbeddedString string `json:"embedded_string"`
+}
+
 type DummyMsg struct {
+	*EmbeddedPtr
+	Embedded
+
 	String    string   `json:"str" endpoints:"req,desc=A string field"`
 	Int       int      `json:"i" endpoints:"min=-200,max=200,d=-100"`
 	Uint      uint     `endpoints:"min=0,max=100"`
@@ -247,6 +258,8 @@ func TestAPIGetSubMethod(t *testing.T) {
 	params := meth.Request.Params
 	tts := [][]interface{}{
 		{"simple", "string", false, "Hello gopher", nil, nil, false, 0},
+		{"msg.embedded_string_ptr", "string", false, nil, nil, nil, false, 0},
+		{"msg.embedded_string", "string", false, nil, nil, nil, false, 0},
 		{"msg.i", "int32", false, -100, -200, 200, false, 0},
 		{"msg.str", "string", true, nil, nil, nil, false, 0},
 		{"msg.Int64", "int64", false, int64(123), nil, nil, false, 0},
@@ -484,6 +497,8 @@ func verifySchema(t *testing.T, schemaID string, schemaProps [][]interface{}) {
 func TestDummyMsgSchema(t *testing.T) {
 	props := [][]interface{}{
 		// name, type, format, required, default, ref, desc
+		{"embedded_string_ptr", "string", "", false, nil, "", ""},
+		{"embedded_string", "string", "", false, nil, "", ""},
 		{"str", "string", "", true, nil, "", "A string field"},
 		{"i", "integer", "int32", false, -100, "", ""},
 		{"Uint", "integer", "uint32", false, nil, "", ""},
