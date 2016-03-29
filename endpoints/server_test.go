@@ -13,8 +13,7 @@ import (
 	"testing"
 
 	"golang.org/x/net/context"
-
-	"appengine/aetest"
+	"google.golang.org/appengine/aetest"
 )
 
 type TestMsg struct {

@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"appengine/aetest"
+	"google.golang.org/appengine/aetest"
 )
 
 // verifyPairs loops over ab slice and calls reflect.DeepEqual() on each pair.

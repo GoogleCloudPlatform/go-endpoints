@@ -13,9 +13,8 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
+	"google.golang.org/appengine/aetest"
 	"google.golang.org/appengine/memcache"
-
-	"appengine/aetest"
 )
 
 func TestParseToken(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"appengine/aetest"
+	"google.golang.org/appengine/aetest"
 )
 
 func TestInvalidAppRevision(t *testing.T) {
