@@ -24,14 +24,12 @@ import (
 	"sync"
 
 	"golang.org/x/net/context"
-	"google.golang.org/appengine/internal"
-	pb "google.golang.org/appengine/internal/user"
 	"google.golang.org/appengine/user"
 )
 
 type cachingAuthenticator struct {
 	// map keys are scopes
-	oauthResponseCache map[string]*pb.GetOAuthUserResponse
+	oauthResponseCache map[string]*user.User
 	// mutex for oauthResponseCache
 	sync.Mutex
 }
@@ -41,21 +39,18 @@ type cachingAuthenticator struct {
 // while the mutex is held.
 func (ca *cachingAuthenticator) populateOAuthResponse(c context.Context, scope string) error {
 	// Only one scope should be cached at once, so we just destroy the cache
-	ca.oauthResponseCache = map[string]*pb.GetOAuthUserResponse{}
+	ca.oauthResponseCache = map[string]*user.User{}
 
-	req := &pb.GetOAuthUserRequest{Scope: &scope}
-	res := &pb.GetOAuthUserResponse{}
-
-	err := internal.Call(c, "user", "GetOAuthUser", req, res)
+	u, err := user.CurrentOAuth(c, scope)
 	if err != nil {
 		return err
 	}
 
-	ca.oauthResponseCache[scope] = res
+	ca.oauthResponseCache[scope] = u
 	return nil
 }
 
-func (ca *cachingAuthenticator) oauthResponse(c context.Context, scope string) (*pb.GetOAuthUserResponse, error) {
+func (ca *cachingAuthenticator) oauthResponse(c context.Context, scope string) (*user.User, error) {
 	ca.Lock()
 	defer ca.Unlock()
 
@@ -71,11 +66,11 @@ func (ca *cachingAuthenticator) oauthResponse(c context.Context, scope string) (
 
 // CurrentOAuthClientID returns a clientID associated with the scope.
 func (ca *cachingAuthenticator) CurrentOAuthClientID(c context.Context, scope string) (string, error) {
-	res, err := ca.oauthResponse(c, scope)
+	u, err := ca.oauthResponse(c, scope)
 	if err != nil {
 		return "", err
 	}
-	return res.GetClientId(), nil
+	return u.ClientID, nil
 }
 
 // CurrentOAuthUser returns a user of this request for the given scope.
@@ -83,17 +78,11 @@ func (ca *cachingAuthenticator) CurrentOAuthClientID(c context.Context, scope st
 //
 // Returns an error if data for this scope is not available.
 func (ca *cachingAuthenticator) CurrentOAuthUser(c context.Context, scope string) (*user.User, error) {
-	res, err := ca.oauthResponse(c, scope)
+	u, err := ca.oauthResponse(c, scope)
 	if err != nil {
 		return nil, err
 	}
-
-	return &user.User{
-		Email:      *res.Email,
-		AuthDomain: *res.AuthDomain,
-		Admin:      res.GetIsAdmin(),
-		ID:         *res.UserId,
-	}, nil
+	return u, nil
 }
 
 // Default implentation of endpoints.AuthenticatorFactory.
@@ -103,6 +92,6 @@ func cachingAuthenticatorFactory() Authenticator {
 	// then there's nothing else to do here.
 	// (was: Fail if ctx is nil.)
 	return &cachingAuthenticator{
-		oauthResponseCache: make(map[string]*pb.GetOAuthUserResponse),
+		oauthResponseCache: make(map[string]*user.User),
 	}
 }
