@@ -9,6 +9,8 @@ This package will let you write Cloud Endpoints backends in Go.
 If you're not familiar with Cloud Endpoints, see Google App Engine official
 documentation for [Python][1] or [Java][2].
 
+This is not an official package and comes with no guarantees or support.
+
 
 ## Install
 
