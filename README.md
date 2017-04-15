@@ -172,7 +172,7 @@ handlers:
 # Important! Even though there's a catch all routing above,
 # without these two lines it's not going to work.
 # Make sure you have this:
-- url: /_ah/spi/.*
+- url: /_ah/api/.*
   script: _go_app
 ```
 
