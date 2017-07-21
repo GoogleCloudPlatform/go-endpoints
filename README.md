@@ -1,7 +1,3 @@
-<a href="https://travis-ci.org/GoogleCloudPlatform/go-endpoints" target="_blank">
-  <img align="right" src="https://api.travis-ci.org/GoogleCloudPlatform/go-endpoints.png"
-       alt="Build Status">
-</a>
 # Cloud Endpoints for Go
 
 This package will let you write Cloud Endpoints backends in Go.
