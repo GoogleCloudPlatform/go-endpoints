@@ -79,14 +79,34 @@ type contextKey int
 // Context value keys.
 const (
 	invalidKey contextKey = iota
-	requestKey
+	requestInfoKey
 	authenticatorKey
 )
 
-// HTTPRequest returns the request associated with a context.
-func HTTPRequest(c context.Context) *http.Request {
-	r, _ := c.Value(requestKey).(*http.Request)
+type requestInfo struct {
+	r  *http.Request
+	si *ServiceInfo
+	mi *MethodInfo
+}
+
+func getRequestInfo(c context.Context) *requestInfo {
+	r, _ := c.Value(requestInfoKey).(*requestInfo)
 	return r
+}
+
+// HTTPRequest returns the request associated with a context.
+//
+// This may only be used on context.Context instances created with NewContext.
+func HTTPRequest(c context.Context) *http.Request {
+	return getRequestInfo(c).r
+}
+
+// EndpointInfo returns the ServiceInfo and MethodInfo of the current endpoint.
+//
+// This may only be used on context.Context instances created with NewContext.
+func EndpointInfo(c context.Context) (*ServiceInfo, *MethodInfo) {
+	ri := getRequestInfo(c)
+	return ri.si, ri.mi
 }
 
 // authenticator returns the Authenticator associated with a
@@ -103,9 +123,9 @@ var (
 )
 
 // NewContext returns a new context for an in-flight API (HTTP) request.
-func NewContext(r *http.Request) context.Context {
+func NewContext(r *http.Request, si *ServiceInfo, mi *MethodInfo) context.Context {
 	c := appengine.NewContext(r)
-	c = context.WithValue(c, requestKey, r)
+	c = context.WithValue(c, requestInfoKey, &requestInfo{r, si, mi})
 	c = context.WithValue(c, authenticatorKey, AuthenticatorFactory())
 	return c
 }
