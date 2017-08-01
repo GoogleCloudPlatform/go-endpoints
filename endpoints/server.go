@@ -104,6 +104,10 @@ func (s *Server) HandleHTTP(mux *http.ServeMux) {
 
 // ServeHTTP is Server's implementation of http.Handler interface.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Always respond with JSON, even when an error occurs.
+	// Note: API server doesn't expect an encoding in Content-Type header.
+	w.Header().Set("Content-Type", "application/json")
+	
 	c := NewContext(r)
 	if s.ContextDecorator != nil {
 		ctx, err := s.ContextDecorator(c)
@@ -113,10 +117,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		c = ctx
 	}
-
-	// Always respond with JSON, even when an error occurs.
-	// Note: API server doesn't expect an encoding in Content-Type header.
-	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != "POST" {
 		err := fmt.Errorf("rpc: POST method required, got %q", r.Method)
