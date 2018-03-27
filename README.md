@@ -1,12 +1,36 @@
+# Notice
+
+This package provides Go support for Cloud Endpoints Frameworks v1, which is **DEPRECATED**
+and will be shut down on August 2, 2018.
+
+This package is unmaintained and comes with no support or guarantee.
+
+If used this product and were primarily interested in code generation and API specifications, you should probably
+investigate the [OpenAPI specification](https://www.google.com/search?q=golang+openapi) and ecosystem.
+
+If you want API authentication and monitoring, you should check out the newer
+Google Cloud Endpoints product (using [OpenAPI](https://cloud.google.com/endpoints/docs/openapi/) or [gRPC](https://cloud.google.com/endpoints/docs/grpc/)).
+Unfortunately, App Engine standard is not supported, so you will need to move your API to App Engine flexible, Compute Engine, or Kubernetes.
+
+---------------------------------------
+---------------------------------------
+---------------------------------------
+---------------------------------------
+---------------------------------------
+---------------------------------------
+---------------------------------------
+---------------------------------------
+---------------------------------------
+---------------------------------------
+---------------------------------------
+
+
 # Cloud Endpoints for Go
 
 This package will let you write Cloud Endpoints backends in Go.
 
 If you're not familiar with Cloud Endpoints, see Google App Engine official
 documentation for [Python][1] or [Java][2].
-
-This is not an official package and comes with no guarantees or support.
-
 
 ## Install
 
