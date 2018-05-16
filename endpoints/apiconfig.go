@@ -586,16 +586,9 @@ func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
 
 	for i := 0; i < numField; i++ {
 		f := t.Field(i)
-		// consider only exported fields
-		if f.PkgPath != "" {
+		name := fieldName(f)
+		if name == "" {
 			continue
-		}
-
-		name := strings.Split(f.Tag.Get("json"), ",")[0]
-		if name == "-" {
-			continue
-		} else if name == "" {
-			name = f.Name
 		}
 
 		if f.Type.Kind() == reflect.Struct && f.Anonymous {
@@ -618,6 +611,29 @@ func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
 	}
 
 	return m
+}
+
+// fieldName returns the exportable name for a struct field. It returns the
+// field name, or the empty string if the field is not exported.
+//
+// If a JSON name override is supplied, that value is used as the field name.
+// Additionally, a field will not be exported if it has a JSON tag that
+// explicitly marks it as such.
+func fieldName(f reflect.StructField) string {
+	// consider only exported fields
+	if f.PkgPath != "" {
+		return ""
+	}
+
+	name := strings.Split(f.Tag.Get("json"), ",")[0]
+	switch name {
+	case "-":
+		return ""
+	case "":
+		return f.Name
+	default:
+		return name
+	}
 }
 
 // schemaNameForType always returns a title version of the public method
@@ -658,7 +674,7 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 		parts := strings.Split(tag, ",")
 		for _, k := range parts {
 			switch k {
-			case "req":
+			case "req", "required":
 				eTag.required = true
 			default:
 				// key=value format
