@@ -16,9 +16,9 @@ function GreetingsCtrl($scope, $http) {
   $scope.greetings = [];
   $scope.running = true;
   var api;
- 
+
   loadAPI(function() {
-    api = gapi.client.greetings;
+    api = gapi.client.greeting;
     // load the messages now and refresh every second after.
     $scope.refresh();
     window.setInterval($scope.refresh, 1000);
@@ -50,8 +50,8 @@ function loadAPI(then) {
 
   window.onAPILoaded = function() {
     var rootpath = "//" + window.location.host + "/_ah/api";
-    gapi.client.load('greetings', 'v1', then, rootpath);
-    window.onAPILoaded = undefined; 
+    gapi.client.load('greeting', 'v1', then, rootpath);
+    window.onAPILoaded = undefined;
   }
   script.src = 'https://apis.google.com/js/client.js?onload=onAPILoaded';
 
