@@ -757,16 +757,35 @@ func validateRequest(r interface{}) error {
 
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
-		if err := validateField(v.Field(i), t.Field(i)); err != nil {
+		if err := validateField(v.Field(i), t.Field(i), t); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateField(v reflect.Value, t reflect.StructField) error {
-	// only validate simple types, ignore arrays, slices, chans, etc.
-	if v.Kind() > reflect.Float64 && v.Kind() != reflect.String {
+func hasExportedFields(v reflect.Value) bool {
+	t := v.Type()
+	n := t.NumField()
+
+	if n == 0 {
+		return false
+	}
+
+	for i := 0; i < n; i++ {
+		if t.Field(i).PkgPath == "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func validateField(v reflect.Value, t reflect.StructField, parent reflect.Type) error {
+	// only validate simple types and structs, ignore arrays, slices, chans, etc.
+	if v.Kind() > reflect.Float64 &&
+		v.Kind() != reflect.String &&
+		v.Kind() != reflect.Struct {
 		return nil
 	}
 
@@ -777,7 +796,16 @@ func validateField(v reflect.Value, t reflect.StructField) error {
 
 	isZero := v.Interface() == reflect.Zero(v.Type()).Interface()
 	if isZero && tag.required {
-		return fmt.Errorf("missing field %v", t.Name)
+		return fmt.Errorf("missing field %v in %v", t.Name, parent.Name())
+	}
+
+	if v.Kind() == reflect.Struct {
+		if v.CanAddr() && hasExportedFields(v) {
+			err := validateRequest(v.Addr().Interface())
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	if isZero && tag.defaultVal != "" {
