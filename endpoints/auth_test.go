@@ -182,7 +182,7 @@ func TestCachedCertsCacheHit(t *testing.T) {
 	}
 	ec := NewContext(req)
 	for i, tt := range tts {
-		item := &memcache.Item{Key: DefaultCertURI, Value: []byte(tt.cacheValue)}
+		item := &memcache.Item{Key: AuthProvider.JWKSURI, Value: []byte(tt.cacheValue)}
 		if err := memcache.Set(nc, item); err != nil {
 			t.Fatal(err)
 		}
@@ -239,7 +239,7 @@ func TestCachedCertsCacheMiss(t *testing.T) {
 			resp.Header.Set("age", tt.age)
 			rt.Add(resp)
 		}
-		memcache.Delete(nc, DefaultCertURI)
+		memcache.Delete(nc, AuthProvider.JWKSURI)
 
 		out, err := cachedCerts(ec)
 		switch {
@@ -254,15 +254,15 @@ func TestCachedCertsCacheMiss(t *testing.T) {
 			if !tt.shouldCache {
 				continue
 			}
-			item, err := memcache.Get(nc, DefaultCertURI)
+			item, err := memcache.Get(nc, AuthProvider.JWKSURI)
 			if err != nil {
-				t.Errorf("%d: memcache.Get(%q) = %v", i, DefaultCertURI, err)
+				t.Errorf("%d: memcache.Get(%q) = %v", i, AuthProvider.JWKSURI, err)
 				continue
 			}
 			cert := string(item.Value)
 			if tt.respContent != cert {
 				t.Errorf("%d: memcache.Get(%q) = %q; want %q",
-					i, DefaultCertURI, cert, tt.respContent)
+					i, AuthProvider.JWKSURI, cert, tt.respContent)
 			}
 		}
 	}
@@ -365,7 +365,7 @@ func TestCurrentUser(t *testing.T) {
 		t.Fatal(err)
 	}
 	// googCerts are provided in jwt_test.go
-	item := &memcache.Item{Key: DefaultCertURI, Value: []byte(googCerts)}
+	item := &memcache.Item{Key: AuthProvider.JWKSURI, Value: []byte(googCerts)}
 	if err := memcache.Set(nc, item); err != nil {
 		t.Fatal(err)
 	}

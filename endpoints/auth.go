@@ -23,16 +23,38 @@ import (
 )
 
 const (
-	// DefaultCertURI is Google's public URL which points to JWT certs.
-	DefaultCertURI = ("https://www.googleapis.com/service_accounts/" +
-		"v1/metadata/raw/federated-signon@system.gserviceaccount.com")
-	// EmailScope is Google's OAuth 2.0 email scope
-	EmailScope = "https://www.googleapis.com/auth/userinfo.email"
-	// TokeninfoURL is Google's OAuth 2.0 access token verification URL
-	TokeninfoURL = "https://www.googleapis.com/oauth2/v1/tokeninfo"
-	// APIExplorerClientID is the client ID of API explorer.
 	APIExplorerClientID = "292824132082.apps.googleusercontent.com"
+	EmailScope          = "https://www.googleapis.com/auth/userinfo.email"
 )
+
+var AuthProvider = &AuthProviderConfig{
+	IssuerID: "accounts.google.com",
+	JWKSURI: "https://www.googleapis.com/service_accounts/" +
+		"v1/metadata/raw/federated-signon@system.gserviceaccount.com",
+	UserInfoEndpoint: "https://www.googleapis.com/oauth2/v1/tokeninfo",
+	ScopesSupported: []string{
+		EmailScope,
+		"openid",
+		"email",
+		"profile",
+	},
+}
+
+// AuthProvider describes an OpenID provider.
+type AuthProviderConfig struct {
+	// IssuerID is verifiable identifier for an issuer. An Issuer Identifier
+	// is a case-sensitive URL using the https scheme that contains scheme,
+	// host, and optionally, port number and path components and no query
+	// or fragment components. Note that Google only uses a hostname.
+	IssuerID string
+	// URL of the OP's JSON Web Key Set.
+	JWKSURI string
+	// UserInfoEndpoint is the URL of the OP's UserInfo Endpoint.
+	UserInfoEndpoint string
+	// ScopesSupported contains a list of the OAuth 2.0 scope values that are
+	// supported by this provider.
+	ScopesSupported []string
+}
 
 var (
 	allowedAuthSchemesUpper = [2]string{"OAUTH", "BEARER"}
@@ -196,7 +218,7 @@ func cachedCerts(c context.Context) (*certsList, error) {
 
 	var certs *certsList
 
-	_, err = memcache.JSON.Get(namespacedContext, DefaultCertURI, &certs)
+	_, err = memcache.JSON.Get(namespacedContext, AuthProvider.JWKSURI, &certs)
 	if err == nil {
 		return certs, nil
 	}
@@ -209,8 +231,8 @@ func cachedCerts(c context.Context) (*certsList, error) {
 		log.Debugf(c, "%s", err.Error())
 	}
 
-	log.Debugf(c, "Fetching provider certs from: %s", DefaultCertURI)
-	resp, err := newHTTPClient(c).Get(DefaultCertURI)
+	log.Debugf(c, "Fetching provider certs from: %s", AuthProvider.JWKSURI)
+	resp, err := newHTTPClient(c).Get(AuthProvider.JWKSURI)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +254,7 @@ func cachedCerts(c context.Context) (*certsList, error) {
 		expiration := certExpirationTime(resp.Header)
 		if expiration > 0 {
 			item := &memcache.Item{
-				Key:        DefaultCertURI,
+				Key:        AuthProvider.JWKSURI,
 				Value:      certBytes,
 				Expiration: expiration,
 			}
@@ -422,7 +444,7 @@ func verifySignedJWT(c context.Context, jwt string, now int64) (*signedJWT, erro
 // by audiences and clientIDs args.
 func verifyParsedToken(c context.Context, token signedJWT, audiences []string, clientIDs []string) bool {
 	// Verify the issuer.
-	if token.Issuer != "accounts.google.com" {
+	if token.Issuer != AuthProvider.IssuerID {
 		log.Warningf(c, "Issuer was not valid: %s", token.Issuer)
 		return false
 	}
@@ -455,10 +477,11 @@ func verifyParsedToken(c context.Context, token signedJWT, audiences []string, c
 		return false
 	}
 
-	if token.Email == "" {
-		log.Warningf(c, "Invalid email value in token")
-		return false
-	}
+	// Some auth provider do not disclose this
+	// if token.Email == "" {
+	// 	log.Warningf(c, "Invalid email value in token")
+	// 	return false
+	// }
 
 	return true
 }
@@ -560,18 +583,14 @@ func CurrentUser(c context.Context, scopes []string, audiences []string, clientI
 		return nil, errors.New("No token in the current context.")
 	}
 
-	// If the only scope is the email scope, check an ID token. Alternatively,
-	// we dould check if token starts with "ya29." or "1/" to decide that it
-	// is a Bearer token. This is what is done in Java.
-	if len(scopes) == 1 && scopes[0] == EmailScope && len(clientIDs) > 0 {
-		log.Debugf(c, "Checking for ID token.")
-		now := currentUTC().Unix()
-		u, err := currentIDTokenUser(c, token, audiences, clientIDs, now)
-		// Only return in case of success, else pass along and try
-		// parsing Bearer token.
-		if err == nil {
-			return u, err
-		}
+	// If the token isn't valid currentIDTokenUser will fail right away
+	log.Debugf(c, "Checking for ID token.")
+	now := currentUTC().Unix()
+	u, err := currentIDTokenUser(c, token, audiences, clientIDs, now)
+	// Only return in case of success, else pass along and try
+	// parsing Bearer token.
+	if err == nil {
+		return u, err
 	}
 
 	log.Debugf(c, "Checking for Bearer token.")
