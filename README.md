@@ -149,7 +149,10 @@ Last step is to make the above available as a **discoverable API**
 and leverage all the juicy stuff Cloud Endpoints are great at.
 
 ```go
-import "github.com/GoogleCloudPlatform/go-endpoints/endpoints"
+import (
+  "github.com/GoogleCloudPlatform/go-endpoints/endpoints"
+  "golang.org/x/net/context"
+)
 
 func init() {
   greetService := &GreetingService{}
